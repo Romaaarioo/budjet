@@ -202,17 +202,11 @@ sheetEl.addEventListener('touchend', () => {
   dragY = null;
 });
 
-// Сегментированные переключатели Расход/Доход
+// Сегментированные переключатели Расход/Доход (в формах)
 function setSeg(form, type) {
   form.dataset.type = type;
   form.querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('on', b.dataset.type === type));
 }
-document.querySelectorAll('.seg').forEach((seg) => (seg.onclick = (e) => {
-  const b = e.target.closest('.seg-btn');
-  if (!b) return;
-  setSeg(seg.closest('form'), b.dataset.type);
-  if (seg.closest('form').id === 'tx-form') fillCat();
-}));
 
 function fillCat() {
   $('tx-category').innerHTML = cats[$('tx-form').dataset.type]
@@ -368,24 +362,69 @@ function renderOverview() {
 }
 
 // ---------- Рендер: АНАЛИТИКА ----------
+let anMonth = month();   // отображаемый месяц ГГГГ-ММ
+let anMode = 'expense';  // expense | income | net
+
+document.querySelectorAll('.seg').forEach((seg) => (seg.onclick = (e) => {
+  const b = e.target.closest('.seg-btn');
+  if (!b) return;
+  seg.querySelectorAll('.seg-btn').forEach((x) => x.classList.toggle('on', x === b));
+  const form = seg.closest('form');
+  if (form) { form.dataset.type = b.dataset.type; if (form.id === 'tx-form') fillCat(); }
+  else { anMode = b.dataset.mode; renderAnalytics(); }
+}));
+$('month-prev').onclick = () => { shiftMonth(-1); };
+$('month-next').onclick = () => { shiftMonth(1); };
+function shiftMonth(d) {
+  const [y, m] = anMonth.split('-').map(Number);
+  const dt = new Date(y, m - 1 + d, 1);
+  anMonth = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+  renderAnalytics();
+}
+
 function renderAnalytics() {
-  const m = month();
+  const [y, m] = anMonth.split('-').map(Number);
+  const MN = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  $('month-label').textContent = `${MN[m - 1]} ${y}`;
+  $('month-next').disabled = anMonth >= month();
+
   let mi = 0, me = 0;
-  const by = {};
+  const byE = {}, byI = {};
   for (const t of txs) {
-    if (!t.date.startsWith(m)) continue;
-    if (t.type === 'income') mi += t.amount;
-    else { me += t.amount; by[t.category] = (by[t.category] || 0) + t.amount; }
+    if (!t.date.startsWith(anMonth)) continue;
+    if (t.type === 'income') { mi += t.amount; byI[t.category] = (byI[t.category] || 0) + t.amount; }
+    else { me += t.amount; byE[t.category] = (byE[t.category] || 0) + t.amount; }
   }
-  $('month-income').textContent = fmt.format(mi);
-  $('month-expense').textContent = fmt.format(me);
+
+  // «Доходы − расходы»
+  if (anMode === 'net') {
+    const net = mi - me;
+    $('an-total-lbl').textContent = 'Доходы − расходы';
+    $('an-total').textContent = fmtSign(net);
+    $('an-total').className = 'big sm ' + (net >= 0 ? 'in' : 'out');
+    $('an-break').innerHTML = `
+      <div class="cols">
+        <div><small>Доходы</small><b class="in">${fmt.format(mi)}</b></div>
+        <div><small>Расходы</small><b class="out">${fmt.format(me)}</b></div>
+        <div><small>Осталось</small><b>${fmt.format(net)}</b></div>
+      </div>`;
+    return;
+  }
+
+  // Расходы или Доходы по категориям
+  const isExp = anMode === 'expense';
+  const total = isExp ? me : mi;
+  const by = isExp ? byE : byI;
+  $('an-total-lbl').textContent = (isExp ? 'Расходы' : 'Доходы') + ' за месяц';
+  $('an-total').textContent = fmt.format(total);
+  $('an-total').className = 'big sm';
 
   const en = Object.entries(by).sort((a, b) => b[1] - a[1]);
-  $('category-bars').innerHTML = en.length ? en.map(([n, s]) => `
+  $('an-break').innerHTML = en.length ? en.map(([n, s]) => `
     <div class="bar">
-      <div class="bar-top"><span>${catIcon('expense', n)} ${esc(n)}</span><b>${fmt.format(s)}</b></div>
-      <div class="track"><i style="width:${Math.round((s / en[0][1]) * 100)}%"></i></div>
-    </div>`).join('') : '<div class="empty">Нет расходов в этом месяце</div>';
+      <div class="bar-top"><span>${catIcon(isExp ? 'expense' : 'income', n)} ${esc(n)}</span><span><b>${fmt.format(s)}</b> <i class="pct">${Math.round((s / total) * 100)}%</i></span></div>
+      <div class="track"><i style="width:${Math.round((s / total) * 100)}%"></i></div>
+    </div>`).join('') : '<div class="empty">Нет данных за этот месяц</div>';
 }
 
 // ---------- Рендер: ОПЕРАЦИИ ----------

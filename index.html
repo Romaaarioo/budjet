@@ -31,11 +31,21 @@
 
   <section id="view-analytics" class="view">
     <h1 class="title">Аналитика</h1>
-    <div class="row2">
-      <div class="card stat"><div class="lbl">Доходы · месяц</div><div class="big sm in" id="month-income">0 ₽</div></div>
-      <div class="card stat"><div class="lbl">Расходы · месяц</div><div class="big sm out" id="month-expense">0 ₽</div></div>
+    <div class="month-nav">
+      <button class="nav-arrow" id="month-prev" aria-label="Предыдущий месяц">‹</button>
+      <div id="month-label"></div>
+      <button class="nav-arrow" id="month-next" aria-label="Следующий месяц">›</button>
     </div>
-    <div class="card"><div class="h2">Расходы по категориям</div><div id="category-bars"></div></div>
+    <div class="seg" id="an-seg">
+      <button type="button" class="seg-btn on" data-mode="expense">Расходы</button>
+      <button type="button" class="seg-btn" data-mode="income">Доходы</button>
+      <button type="button" class="seg-btn" data-mode="net">Доходы − расходы</button>
+    </div>
+    <div class="card compact">
+      <div class="lbl" id="an-total-lbl">Расходы за месяц</div>
+      <div class="big sm" id="an-total">0 ₽</div>
+    </div>
+    <div class="card compact"><div id="an-break"></div></div>
   </section>
 
   <section id="view-history" class="view">
