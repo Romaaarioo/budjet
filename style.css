@@ -216,6 +216,7 @@ input, select {
   transition: box-shadow .2s;
 }
 input:focus, select:focus { box-shadow: 0 0 0 2px var(--acc); }
+input[type="date"] { min-width: 0; padding: 12px 8px; font-size: 15px; }
 
 /* Сегментированный переключатель */
 .seg { display: flex; background: rgba(120, 120, 128, .16); border-radius: 10px; padding: 2px; margin-bottom: 16px; }

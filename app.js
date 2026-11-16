@@ -93,13 +93,14 @@ function runPays() {
 
 // ---------- Модальное окно ----------
 const modal = $('modal');
-let editing = null; // id редактируемой инвестиции
+let editing = null;    // id редактируемой инвестиции
+let editingTx = null;  // id редактируемой операции
 
 function openModal(kind) {
   ['tx', 'inv', 'cat', 'pay'].forEach((k) => ($(`${k}-form`).hidden = k !== kind));
   modal.classList.add('open');
   document.body.style.overflow = 'hidden'; // фон не скроллится, пока открыто окно
-  if (kind === 'tx') { $('tx-date').value = todayISO(); fillCat(); }
+  if (kind === 'tx' && editingTx === null) { $('tx-date').value = todayISO(); fillCat(); }
   if (kind === 'cat') { setSeg($('cat-form'), 'expense'); pickEmoji('🍔'); $('cat-emoji').value = ''; }
 }
 function closeModal() {
@@ -107,10 +108,11 @@ function closeModal() {
   document.body.style.overflow = '';
   document.querySelectorAll('.sheet form').forEach((f) => f.reset());
   editing = null;
+  editingTx = null;
 }
 $('fab').onclick = () => {
   const v = document.querySelector('.view.active').id.slice(5);
-  openModal({ overview: 'tx', history: 'tx', investments: 'inv', categories: 'cat', autopays: 'pay' }[v]);
+  openModal({ overview: 'tx', history: 'tx', analytics: 'tx', investments: 'inv', categories: 'cat', autopays: 'pay' }[v]);
 };
 modal.onclick = (e) => { if (e.target === modal) closeModal(); };
 document.querySelectorAll('.cancel').forEach((b) => (b.onclick = closeModal));
@@ -167,12 +169,27 @@ sheetEl.addEventListener('touchend', () => {
 });
 
 // ---------- Сохранение форм ----------
+// Редактирование операции (клик по строке в истории)
+function editTx(id) {
+  const t = txs.find((x) => x.id == id);
+  editingTx = t.id;
+  openModal('tx');
+  setSeg($('tx-form'), t.type);
+  fillCat();
+  $('tx-amount').value = t.amount;
+  $('tx-category').value = t.category;
+  $('tx-note').value = t.note || '';
+  $('tx-date').value = t.date;
+}
+
 $('tx-form').onsubmit = (e) => {
   e.preventDefault();
-  txs.push({
-    id: Date.now(), type: $('tx-form').dataset.type, amount: +$('tx-amount').value,
+  const d = {
+    type: $('tx-form').dataset.type, amount: +$('tx-amount').value,
     category: $('tx-category').value, note: $('tx-note').value.trim(), date: $('tx-date').value || todayISO(),
-  });
+  };
+  if (editingTx) Object.assign(txs.find((t) => t.id === editingTx), d);
+  else txs.push({ id: Date.now(), ...d });
   save(); renderAll(); closeModal();
 };
 
@@ -243,7 +260,7 @@ function renderHistory() {
     }
     const inc = t.type === 'income';
     html += `
-      <div class="li">
+      <div class="li tap" data-id="${t.id}">
         <div class="ic">${icon(t.type, t.category)}</div>
         <div class="grow"><div class="name">${esc(t.category)}</div>${t.note ? `<div class="note">${esc(t.note)}</div>` : ''}</div>
         <div class="amt ${inc ? 'in' : 'out'}">${inc ? '+' : '−'}${fmt.format(t.amount)}</div>
@@ -252,8 +269,13 @@ function renderHistory() {
   }
   box.innerHTML = html + '</div>';
 
-  box.querySelectorAll('.del').forEach((b) => (b.onclick = () => {
+  box.querySelectorAll('.del').forEach((b) => (b.onclick = (e) => {
+    e.stopPropagation();
     if (confirm('Удалить операцию?')) { txs = txs.filter((t) => t.id != b.dataset.id); save(); renderAll(); }
+  }));
+  box.querySelectorAll('.li.tap').forEach((row) => (row.onclick = (e) => {
+    if (e.target.closest('.del')) return;
+    editTx(row.dataset.id);
   }));
 }
 
