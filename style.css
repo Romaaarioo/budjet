@@ -161,6 +161,9 @@ body {
 .sw-del { background: var(--red); }
 .sw-edit svg, .sw-del svg { width: 20px; height: 20px; }
 .li { background: var(--li); transition: transform .25s ease; }
+/* Строка должна перекрывать кнопки свайпа (абсолютные элементы рисуются выше) */
+.swipe > .li, .swipe > .card { position: relative; z-index: 1; }
+.swipe > .card { background: var(--li); }
 .card { transition: background .3s, transform .25s ease; }
 
 /* ============ ПЕРЕКЛЮЧАТЕЛЬ (iOS switch) ============ */
