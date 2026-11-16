@@ -15,6 +15,7 @@ const save = () => {
   localStorage.setItem('fin_cards', JSON.stringify(cards));
   localStorage.setItem('fin_cashback', JSON.stringify(cbs));
   localStorage.setItem('fin_budgets', JSON.stringify(budgets));
+  localStorage.setItem('fin_goals', JSON.stringify(goals));
 };
 
 // ---------- SVG-иконки (стиль Lucide) ----------
@@ -61,6 +62,7 @@ let accounts = load('fin_accounts', []);  // счета
 let cards = load('fin_cards', []);        // карты для кэшбэка
 let cbs = load('fin_cashback', []);       // полученный кэшбэк
 let budgets = load('fin_budgets', {});    // лимиты: категория → сумма в месяц
+let goals = load('fin_goals', []);
 let cats = load('fin_categories') || {    // категории
   expense: [
     { icon: 'food', name: 'Продукты' }, { icon: 'bus', name: 'Транспорт' },
@@ -176,7 +178,7 @@ glassBox.onchange = () => {
   localStorage.setItem('fin_glass', glassBox.checked);
 };
 
-const DATA_KEYS = ['fin_transactions', 'fin_investments', 'fin_categories', 'fin_autopays', 'fin_accounts', 'fin_cards', 'fin_cashback', 'fin_budgets'];
+const DATA_KEYS = ['fin_transactions', 'fin_investments', 'fin_categories', 'fin_autopays', 'fin_accounts', 'fin_cards', 'fin_cashback', 'fin_budgets', 'fin_goals'];
 $('export-data').onclick = () => {
   const data = { app: 'moi-finansy', exported: new Date().toISOString() };
   DATA_KEYS.forEach((k) => (data[k] = JSON.parse(localStorage.getItem(k) || 'null')));
@@ -203,7 +205,7 @@ $('import-file').onchange = async (e) => {
 
 $('clear-data').onclick = () => {
   if (confirm('Удалить ВСЕ данные? Действие необратимо.')) {
-    ['fin_transactions', 'fin_investments', 'fin_categories', 'fin_autopays', 'fin_accounts', 'fin_cards', 'fin_cashback', 'fin_budgets'].forEach((k) => localStorage.removeItem(k));
+    ['fin_transactions', 'fin_investments', 'fin_categories', 'fin_autopays', 'fin_accounts', 'fin_cards', 'fin_cashback', 'fin_budgets', 'fin_goals'].forEach((k) => localStorage.removeItem(k));
     location.reload();
   }
 };
@@ -231,7 +233,7 @@ let editingCard = null;  // id редактируемой карты
 let editingBudget = null; // категория редактируемого лимита
 
 function openModal(kind) {
-  ['tx', 'inv', 'cat', 'pay', 'acc', 'card', 'cb', 'budget'].forEach((k) => ($(`${k}-form`).hidden = k !== kind));
+  ['tx', 'inv', 'cat', 'pay', 'acc', 'card', 'cb', 'budget', 'goal'].forEach((k) => ($(`${k}-form`).hidden = k !== kind));
   modal.classList.add('open');
   document.body.style.overflow = 'hidden'; // фон не скроллится, пока открыто окно
   if (kind === 'tx' && editingTx === null) {
@@ -427,6 +429,11 @@ $('budget-form').onsubmit = (e) => {
 };
 $('budget-remove').onclick = () => {
   delete budgets[editingBudget];
+  save(); renderAll(); closeModal();
+};
+$('goal-form').onsubmit = (e) => {
+  e.preventDefault();
+  goals.push({id:Date.now(),name:$('goal-name').value.trim(),target:+$('goal-target').value,saved:+$('goal-saved').value,date:$('goal-date').value});
   save(); renderAll(); closeModal();
 };
 
@@ -658,6 +665,21 @@ function renderAnalytics() {
       </div>`).join('');
 }
 
+function renderTrend() {
+  const months = Array.from({length:6},(_,i)=>{const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-5+i);return d.toISOString().slice(0,7)});
+  const vals=months.map(m=>txs.filter(t=>t.date.startsWith(m)&&t.type!=='transfer').reduce((a,t)=>{a[t.type==='income'?'inc':'out']+=t.amount;return a},{inc:0,out:0}));
+  const max=Math.max(1,...vals.flatMap(v=>[v.inc,v.out]));
+  $('an-trend').innerHTML=vals.map((v,i)=>`<div class="trend"><span>${months[i].slice(5)}</span><i style="height:${Math.max(3,v.inc/max*70)}px;background:var(--green)"></i><i style="height:${Math.max(3,v.out/max*70)}px;background:var(--red)"></i></div>`).join('');
+  const last=vals[5],prev=vals[4],catsNow={},catsPrev={};
+  txs.filter(t=>t.type==='expense').forEach(t=>{const m=t.date.slice(0,7),o=m===months[5]?catsNow:m===months[4]?catsPrev:null;if(o)o[t.category]=(o[t.category]||0)+t.amount});
+  const n=Object.keys(catsNow).sort((a,b)=>catsNow[b]-catsNow[a])[0];
+  $('an-insights').textContent=n&&catsPrev[n]?`${n}: ${Math.round((catsNow[n]/catsPrev[n]-1)*100)}% к прошлому месяцу`:`Доходы ${fmt.format(last.inc)}, расходы ${fmt.format(last.out)} за месяц`;
+}
+
+function renderGoals() {
+  $('goal-list').innerHTML=goals.length?goals.map(g=>`<div class="card goal"><b>${esc(g.name)}</b><span>${fmt.format(g.saved)} / ${fmt.format(g.target)}</span><div class="track"><i style="width:${Math.min(100,g.saved/g.target*100)}%"></i></div><small>${g.date?`К ${g.date}`:`Осталось ${fmt.format(Math.max(0,g.target-g.saved))}`}</small></div>`).join(''):'<div class="empty">Пока нет целей</div>';
+}
+
 // ---------- Рендер: ОПЕРАЦИИ ----------
 let hFilter = 'all';   // all | expense | income | transfer
 let hQuery = '';
@@ -819,14 +841,16 @@ function renderCats() {
 }
 
 function renderPays() {
-  $('autopay-list').innerHTML = pays.length ? pays.map((p) => `
+  const now=new Date(), next=p=>{let d=new Date(now.getFullYear(),now.getMonth(),Math.min(p.day,new Date(now.getFullYear(),now.getMonth()+1,0).getDate()));if(d<new Date(now.getFullYear(),now.getMonth(),now.getDate()))d=new Date(now.getFullYear(),now.getMonth()+1,Math.min(p.day,new Date(now.getFullYear(),now.getMonth()+2,0).getDate()));return d};
+  const upcoming=pays.reduce((s,p)=>s+p.amount,0);
+  $('autopay-list').innerHTML = (pays.length?`<div class="sec">В месяц: ${fmt.format(upcoming)}</div>`:'')+(pays.length ? [...pays].sort((a,b)=>next(a)-next(b)).map((p) => `
     <div class="swipe">
       <div class="swipe-actions"></div>
       <div class="li" data-id="${p.id}">
         <div class="ic">${svgIcon('refresh')}</div>
-        <div class="grow"><div class="name">${esc(p.name)}</div><div class="note">${p.day}-го числа · ${fmt.format(p.amount)}</div></div>
+        <div class="grow"><div class="name">${esc(p.name)}</div><div class="note">${formatDate(next(p).toISOString().slice(0,10))} · ${fmt.format(p.amount)}</div></div>
       </div>
-    </div>`).join('') : '<div class="empty">Автоплатежей нет. Нажми «Добавить», чтобы настроить</div>';
+    </div>`).join('') : '<div class="empty">Автоплатежей нет. Нажми «Добавить», чтобы настроить</div>');
   $('autopay-list').querySelectorAll('.swipe').forEach((el) => {
     const pid = el.querySelector('.li').dataset.id;
     bindSwipe(el, [
@@ -836,6 +860,7 @@ function renderPays() {
 }
 
 // ---------- Запуск ----------
+$('add-goal').onclick = () => openModal('goal');
 $('add-cat').onclick = () => openModal('cat');
 $('add-pay').onclick = () => openModal('pay');
 $('add-acc').onclick = () => openModal('acc');
@@ -844,7 +869,7 @@ $('add-cb').onclick = () => {
   if (!cards.length) { alert('Сначала добавь карту'); return; }
   openModal('cb');
 };
-function renderAll() { renderOverview(); renderAnalytics(); renderHistory(); renderInvestments(); renderCashback(); renderCats(); renderPays(); }
+function renderAll() { renderOverview(); renderAnalytics(); renderTrend(); renderGoals(); renderHistory(); renderInvestments(); renderCashback(); renderCats(); renderPays(); }
 runPays();
 renderAll();
 showView('overview');
