@@ -546,7 +546,7 @@ function setAnSegUI() {
 
 // Круговая диаграмма
 function donut(entries, total) {
-  const C = ['#0a84ff', '#ff9f0a', '#30d158', '#ff453a', '#bf5af2', '#64d2ff', '#ffd60a', '#ff6482', '#a2845e', '#8e8e93'];
+  const C = ['#9a8769', '#b5a385', '#7e8b76', '#a87669', '#777c72', '#c0b89d', '#8c7965', '#a19a89', '#777f80', '#b28f83'];
   let acc = 0;
   const segs = entries.map(([n, s], i) => {
     const f = (s / total) * 100;
@@ -602,7 +602,7 @@ function renderAnalytics() {
     if (totalLimit) {
       const pct = Math.round((spent / totalLimit) * 100);
       const w = Math.min(100, pct);
-      const color = pct >= 100 ? 'var(--red)' : pct >= 80 ? '#ff9f0a' : 'var(--green)';
+      const color = pct >= 100 ? 'var(--red)' : pct >= 80 ? 'var(--acc)' : 'var(--green)';
       const [ay, am] = anMonth.split('-').map(Number);
       const daysIn = new Date(ay, am, 0).getDate();
       const daysLeft = daysIn - new Date().getDate() + 1;
@@ -616,7 +616,7 @@ function renderAnalytics() {
     html += rows.map(({ n, s, lim }) => {
       if (!lim) return `<div class="bar tap-budget" data-cat="${esc(n)}"><div class="bar-top"><span>${catIcon('expense', n)} ${esc(n)}</span><span class="pct">＋ лимит</span></div></div>`;
       const pct = Math.min(100, Math.round((s / lim) * 100));
-      const color = pct >= 100 ? 'var(--red)' : pct >= 80 ? '#ff9f0a' : 'var(--green)';
+      const color = pct >= 100 ? 'var(--red)' : pct >= 80 ? 'var(--acc)' : 'var(--green)';
       const rest = lim - s;
       return `<div class="bar tap-budget" data-cat="${esc(n)}"><div class="bar-top"><span>${catIcon('expense', n)} ${esc(n)}</span><span><b>${fmt.format(s)}</b> <i class="pct">из ${fmt.format(lim)}</i></span></div><div class="track"><i style="width:${pct}%;background:${color}"></i></div><div class="budget-rest ${rest < 0 ? 'out' : ''}">${rest >= 0 ? 'Осталось ' + fmt.format(rest) : 'Перерасход ' + fmt.format(-rest)}</div></div>`;
     }).join('');
