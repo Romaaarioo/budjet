@@ -14,6 +14,7 @@ const save = () => {
   localStorage.setItem('fin_accounts', JSON.stringify(accounts));
   localStorage.setItem('fin_cards', JSON.stringify(cards));
   localStorage.setItem('fin_cashback', JSON.stringify(cbs));
+  localStorage.setItem('fin_budgets', JSON.stringify(budgets));
 };
 
 // ---------- SVG-иконки (стиль Lucide) ----------
@@ -44,6 +45,7 @@ const ICONS = {
   trash:   '<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>',
   tag:     '<path d="M12.6 2.6 21.4 11.4a2 2 0 0 1 0 2.8l-7.2 7.2a2 2 0 0 1-2.8 0L2.6 12.6V4a2 2 0 0 1 2-2z"/><circle cx="7.5" cy="7.5" r="1"/>',
   moon:    '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/>',
+  transfer:'<path d="M4 7h15"/><path d="m15 3 4 4-4 4"/><path d="M20 17H5"/><path d="m9 21-4-4 4-4"/>',
   list:    '<path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/>',
   pie:     '<path d="M21.2 15.9A10 10 0 1 1 8 2.8"/><path d="M22 12A10 10 0 0 0 12 2v10z"/>',
 };
@@ -58,6 +60,7 @@ let pays = load('fin_autopays', []);      // автоплатежи
 let accounts = load('fin_accounts', []);  // счета
 let cards = load('fin_cards', []);        // карты для кэшбэка
 let cbs = load('fin_cashback', []);       // полученный кэшбэк
+let budgets = load('fin_budgets', {});    // лимиты: категория → сумма в месяц
 let cats = load('fin_categories') || {    // категории
   expense: [
     { icon: 'food', name: 'Продукты' }, { icon: 'bus', name: 'Транспорт' },
@@ -175,7 +178,7 @@ glassBox.onchange = () => {
 
 $('clear-data').onclick = () => {
   if (confirm('Удалить ВСЕ данные? Действие необратимо.')) {
-    ['fin_transactions', 'fin_investments', 'fin_categories', 'fin_autopays', 'fin_accounts', 'fin_cards', 'fin_cashback'].forEach((k) => localStorage.removeItem(k));
+    ['fin_transactions', 'fin_investments', 'fin_categories', 'fin_autopays', 'fin_accounts', 'fin_cards', 'fin_cashback', 'fin_budgets'].forEach((k) => localStorage.removeItem(k));
     location.reload();
   }
 };
@@ -200,16 +203,22 @@ let editing = null;      // id редактируемой инвестиции
 let editingTx = null;    // id редактируемой операции
 let editingAcc = null;   // id редактируемого счёта
 let editingCard = null;  // id редактируемой карты
+let editingBudget = null; // категория редактируемого лимита
 
 function openModal(kind) {
-  ['tx', 'inv', 'cat', 'pay', 'acc', 'card', 'cb'].forEach((k) => ($(`${k}-form`).hidden = k !== kind));
+  ['tx', 'inv', 'cat', 'pay', 'acc', 'card', 'cb', 'budget'].forEach((k) => ($(`${k}-form`).hidden = k !== kind));
   modal.classList.add('open');
   document.body.style.overflow = 'hidden'; // фон не скроллится, пока открыто окно
-  if (kind === 'tx' && editingTx === null) { $('tx-date').value = todayISO(); fillCat(); fillAcc(); }
+  if (kind === 'tx' && editingTx === null) { $('tx-date').value = todayISO(); fillCat(); fillAcc(); syncTxForm(); }
   if (kind === 'cat') { setSeg($('cat-form'), 'expense'); pickEmoji($('cat-form'), 'sparkle'); $('cat-emoji').value = ''; }
   if (kind === 'acc') { pickEmoji($('acc-form'), 'cash'); $('acc-emoji').value = ''; }
   if (kind === 'cb') { $('cb-date').value = todayISO(); fillCbCards(); }
   if (kind === 'card') fillCbCards();
+  if (kind === 'budget') {
+    $('budget-title').textContent = 'Лимит: ' + editingBudget;
+    $('budget-limit').value = budgets[editingBudget] || '';
+    $('budget-remove').hidden = !budgets[editingBudget];
+  }
 }
 function closeModal() {
   modal.classList.remove('open');
@@ -219,6 +228,7 @@ function closeModal() {
   editingTx = null;
   editingAcc = null;
   editingCard = null;
+  editingBudget = null;
 }
 $('fab').onclick = () => openModal('tx');
 modal.onclick = (e) => { if (e.target === modal) closeModal(); };
@@ -257,7 +267,7 @@ document.querySelectorAll('.seg').forEach((seg) => (seg.onclick = (e) => {
   if (!b) return;
   seg.querySelectorAll('.seg-btn').forEach((x) => x.classList.toggle('on', x === b));
   const form = seg.closest('form');
-  if (form) { form.dataset.type = b.dataset.type; if (form.id === 'tx-form') fillCat(); }
+  if (form) { form.dataset.type = b.dataset.type; if (form.id === 'tx-form') { syncTxForm(); if (b.dataset.type !== 'transfer') fillCat(); } }
   else { anMode = b.dataset.mode; renderAnalytics(); }
 }));
 
@@ -266,8 +276,20 @@ function fillCat() {
     .map((c) => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('');
 }
 function fillAcc() {
-  $('tx-account').innerHTML = accounts
-    .map((a) => `<option value="${a.id}">${esc(a.name)}</option>`).join('');
+  const opts = accounts.map((a) => `<option value="${a.id}">${esc(a.name)}</option>`).join('');
+  $('tx-account').innerHTML = opts;
+  $('tx-from').innerHTML = opts;
+  $('tx-to').innerHTML = opts;
+}
+// Показ полей: перевод — «откуда/куда», расход/доход — категория и счёт
+function syncTxForm() {
+  const tr = $('tx-form').dataset.type === 'transfer';
+  $('tx-cat-wrap').hidden = tr;
+  $('tx-acc-wrap').hidden = tr;
+  $('tx-transfer-wrap').hidden = !tr;
+  if (tr && accounts.length > 1 && $('tx-from').value === $('tx-to').value) {
+    $('tx-to').value = accounts.find((a) => a.id !== +$('tx-from').value).id;
+  }
 }
 function fillCbCards() {
   $('cb-card').innerHTML = cards.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
@@ -299,11 +321,19 @@ document.querySelectorAll('.emoji-input').forEach((inp) => (inp.oninput = (e) =>
 // ---------- Сохранение форм ----------
 $('tx-form').onsubmit = (e) => {
   e.preventDefault();
-  const d = {
-    type: $('tx-form').dataset.type, amount: +$('tx-amount').value,
-    category: $('tx-category').value, account: +$('tx-account').value,
-    note: $('tx-note').value.trim(), date: $('tx-date').value || todayISO(),
-  };
+  const type = $('tx-form').dataset.type;
+  let d;
+  if (type === 'transfer') {
+    const from = +$('tx-from').value, to = +$('tx-to').value;
+    if (from === to) { alert('Выбери разные счета'); return; }
+    d = { type, amount: +$('tx-amount').value, from, to, note: $('tx-note').value.trim(), date: $('tx-date').value || todayISO() };
+  } else {
+    d = {
+      type, amount: +$('tx-amount').value,
+      category: $('tx-category').value, account: +$('tx-account').value,
+      note: $('tx-note').value.trim(), date: $('tx-date').value || todayISO(),
+    };
+  }
   if (editingTx) Object.assign(txs.find((t) => t.id === editingTx), d);
   else txs.push({ id: Date.now(), ...d });
   save(); renderAll(); closeModal();
@@ -344,17 +374,34 @@ $('cb-form').onsubmit = (e) => {
   save(); renderAll(); closeModal();
 };
 
+$('budget-form').onsubmit = (e) => {
+  e.preventDefault();
+  const v = +$('budget-limit').value;
+  if (v > 0) budgets[editingBudget] = v; else delete budgets[editingBudget];
+  save(); renderAll(); closeModal();
+};
+$('budget-remove').onclick = () => {
+  delete budgets[editingBudget];
+  save(); renderAll(); closeModal();
+};
+
 // ---------- Редактирование ----------
 function editTx(id) {
   const t = txs.find((x) => x.id == id);
   editingTx = t.id;
   openModal('tx');
   setSeg($('tx-form'), t.type);
-  fillCat();
   fillAcc();
+  syncTxForm();
   $('tx-amount').value = t.amount;
-  $('tx-category').value = t.category;
-  $('tx-account').value = t.account || (accounts[0] && accounts[0].id);
+  if (t.type === 'transfer') {
+    $('tx-from').value = t.from;
+    $('tx-to').value = t.to;
+  } else {
+    fillCat();
+    $('tx-category').value = t.category;
+    $('tx-account').value = t.account || (accounts[0] && accounts[0].id);
+  }
   $('tx-note').value = t.note || '';
   $('tx-date').value = t.date;
 }
@@ -382,10 +429,13 @@ function editCard(id) {
 function renderOverview() {
   $('total-balance').textContent = fmt.format(
     accounts.reduce((s, a) => s + a.start, 0) +
-    txs.reduce((s, t) => s + (t.type === 'income' ? t.amount : -t.amount), 0)
+    txs.reduce((s, t) => t.type === 'transfer' ? s : s + (t.type === 'income' ? t.amount : -t.amount), 0)
   );
 
-  const bal = (a) => a.start + txs.reduce((s, t) => t.account === a.id ? s + (t.type === 'income' ? t.amount : -t.amount) : s, 0);
+  const bal = (a) => a.start + txs.reduce((s, t) =>
+    t.type === 'transfer'
+      ? s + (t.to === a.id ? t.amount : t.from === a.id ? -t.amount : 0)
+      : t.account === a.id ? s + (t.type === 'income' ? t.amount : -t.amount) : s, 0);
   $('account-list').innerHTML = accounts.map((a) => {
     const b = bal(a);
     return `
@@ -413,6 +463,7 @@ function deleteAccount(id) {
   if (accounts.length === 1) { alert('Должен остаться хотя бы один счёт'); return; }
   if (confirm(`Удалить «${a.name}»? Его операции перейдут на другой счёт.`)) {
     const other = accounts.find((x) => x.id !== id).id;
+    txs = txs.filter((t) => t.type !== 'transfer' || (t.from !== id && t.to !== id));
     txs.forEach((t) => { if (t.account === id) t.account = other; });
     accounts = accounts.filter((x) => x.id !== id);
     save(); renderAll();
@@ -469,9 +520,61 @@ function renderAnalytics() {
   let mi = 0, me = 0;
   const byE = {}, byI = {};
   for (const t of txs) {
-    if (!t.date.startsWith(anMonth)) continue;
+    if (!t.date.startsWith(anMonth) || t.type === 'transfer') continue;
     if (t.type === 'income') { mi += t.amount; byI[t.category] = (byI[t.category] || 0) + t.amount; }
     else { me += t.amount; byE[t.category] = (byE[t.category] || 0) + t.amount; }
+  }
+
+  // Бюджеты по категориям
+  if (anMode === 'budget') {
+    $('an-toggle').style.display = 'none';
+    const totalLimit = Object.values(budgets).reduce((s, v) => s + v, 0);
+    const spent = Object.entries(byE).reduce((s, [n, v]) => s + (budgets[n] ? v : 0), 0);
+    const left = totalLimit - spent;
+
+    if (!totalLimit) {
+      $('an-total-lbl').textContent = 'Бюджеты на месяц';
+      $('an-total').textContent = 'Не настроены';
+      $('an-total').className = 'big sm';
+    } else {
+      $('an-total-lbl').textContent = left >= 0 ? 'Осталось от бюджета' : 'Перерасход';
+      $('an-total').textContent = fmt.format(Math.abs(left));
+      $('an-total').className = 'big sm ' + (left >= 0 ? 'in' : 'out');
+    }
+
+    const names = [...new Set([...cats.expense.map((c) => c.name), ...Object.keys(byE)])];
+    const rows = names.map((n) => ({ n, s: byE[n] || 0, lim: budgets[n] || 0 }))
+      .sort((a, b) => (b.lim ? 1 : 0) - (a.lim ? 1 : 0) || b.s - a.s);
+
+    let html = '';
+    if (totalLimit) {
+      const pct = Math.round((spent / totalLimit) * 100);
+      const w = Math.min(100, pct);
+      const color = pct >= 100 ? 'var(--red)' : pct >= 80 ? '#ff9f0a' : 'var(--green)';
+      const [ay, am] = anMonth.split('-').map(Number);
+      const daysIn = new Date(ay, am, 0).getDate();
+      const daysLeft = daysIn - new Date().getDate() + 1;
+      const perDay = anMonth === month() && left > 0 ? Math.round(left / Math.max(1, daysLeft)) : null;
+      html += `<div class="bar"><div class="bar-top"><span>Потрачено <b>${fmt.format(spent)}</b> из ${fmt.format(totalLimit)}</span><span class="pct">${pct}%</span></div><div class="track"><i style="width:${w}%;background:${color}"></i></div></div>`;
+      if (perDay !== null) html += `<div class="budget-hint">Можно тратить <b>${fmt.format(perDay)}</b> в день · осталось ${daysLeft} дн.</div>`;
+    } else {
+      html += '<div class="empty" style="margin-bottom:8px">Нажми на категорию, чтобы задать лимит</div>';
+    }
+
+    html += rows.map(({ n, s, lim }) => {
+      if (!lim) return `<div class="bar tap-budget" data-cat="${esc(n)}"><div class="bar-top"><span>${catIcon('expense', n)} ${esc(n)}</span><span class="pct">＋ лимит</span></div></div>`;
+      const pct = Math.min(100, Math.round((s / lim) * 100));
+      const color = pct >= 100 ? 'var(--red)' : pct >= 80 ? '#ff9f0a' : 'var(--green)';
+      const rest = lim - s;
+      return `<div class="bar tap-budget" data-cat="${esc(n)}"><div class="bar-top"><span>${catIcon('expense', n)} ${esc(n)}</span><span><b>${fmt.format(s)}</b> <i class="pct">из ${fmt.format(lim)}</i></span></div><div class="track"><i style="width:${pct}%;background:${color}"></i></div><div class="budget-rest ${rest < 0 ? 'out' : ''}">${rest >= 0 ? 'Осталось ' + fmt.format(rest) : 'Перерасход ' + fmt.format(-rest)}</div></div>`;
+    }).join('');
+
+    $('an-break').innerHTML = html;
+    $('an-break').querySelectorAll('.tap-budget').forEach((el) => (el.onclick = () => {
+      editingBudget = el.dataset.cat;
+      openModal('budget');
+    }));
+    return;
   }
 
   // «Доходы − расходы»
@@ -523,15 +626,18 @@ function renderHistory() {
       html += `<div class="card list"><div class="sec">${formatDate(t.date)}</div>`;
       last = t.date;
     }
-    const inc = t.type === 'income';
+    const tr = t.type === 'transfer';
+    const from = tr && accounts.find((a) => a.id === t.from);
+    const to = tr && accounts.find((a) => a.id === t.to);
     const acc = accounts.find((a) => a.id === t.account);
+    const inc = t.type === 'income';
     html += `
       <div class="swipe">
         <div class="swipe-actions"></div>
         <div class="li tap" data-id="${t.id}">
-          <div class="ic">${catIcon(t.type, t.category)}</div>
-          <div class="grow"><div class="name">${esc(t.category)}</div>${t.note ? `<div class="note">${esc(t.note)}</div>` : ''}${acc ? `<div class="note">${esc(acc.name)}</div>` : ''}</div>
-          <div class="amt ${inc ? 'in' : 'out'}">${inc ? '+' : '−'}${fmt.format(t.amount)}</div>
+          <div class="ic">${tr ? svgIcon('transfer') : catIcon(t.type, t.category)}</div>
+          <div class="grow"><div class="name">${tr ? 'Перевод' : esc(t.category)}</div>${t.note ? `<div class="note">${esc(t.note)}</div>` : ''}${tr ? `<div class="note">${from ? esc(from.name) : '—'} → ${to ? esc(to.name) : '—'}</div>` : acc ? `<div class="note">${esc(acc.name)}</div>` : ''}</div>
+          <div class="amt ${tr ? '' : inc ? 'in' : 'out'}">${tr ? '' : inc ? '+' : '−'}${fmt.format(t.amount)}</div>
         </div>
       </div>`;
   }
@@ -632,6 +738,7 @@ function renderCats() {
       { icon: 'trash', cls: 'sw-del', cb: () => {
         cats.expense = cats.expense.filter((c) => c.name !== name);
         cats.income = cats.income.filter((c) => c.name !== name);
+        delete budgets[name];
         save(); renderAll();
       } },
     ]);
