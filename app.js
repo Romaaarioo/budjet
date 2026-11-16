@@ -11,11 +11,13 @@ const save = () => {
   localStorage.setItem('fin_investments', JSON.stringify(invs));
   localStorage.setItem('fin_categories', JSON.stringify(cats));
   localStorage.setItem('fin_autopays', JSON.stringify(pays));
+  localStorage.setItem('fin_accounts', JSON.stringify(accounts));
 };
 
 let txs = load('fin_transactions', []);   // доходы/расходы
 let invs = load('fin_investments', []);   // инвестиции
 let pays = load('fin_autopays', []);      // автоплатежи
+let accounts = load('fin_accounts', []);  // счета
 let cats = load('fin_categories') || {    // категории
   expense: [
     { icon: '🍔', name: 'Продукты' }, { icon: '🚌', name: 'Транспорт' },
@@ -29,6 +31,16 @@ let cats = load('fin_categories') || {    // категории
   ],
 };
 if (!localStorage.getItem('fin_categories')) save();
+
+// Счета: при первом запуске создаём два счёта и привязываем к первому все операции без счёта
+if (!accounts.length) {
+  accounts = [
+    { id: 1, name: 'Наличные', icon: '💵', start: 0 },
+    { id: 2, name: 'Карта', icon: '💳', start: 0 },
+  ];
+  txs.forEach((t) => (t.account = 1));
+  save();
+}
 
 // ---------- Утилиты ----------
 const fmtSign = (n) => (n >= 0 ? '+' : '−') + fmt.format(Math.abs(n));
@@ -48,7 +60,7 @@ function showView(name) {
   document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.id === 'view-' + name));
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active',
     t.dataset.view === name || (t.dataset.view === 'more' && ['categories', 'autopays'].includes(name))));
-  $('fab').hidden = name === 'more';
+  $('fab').hidden = name !== 'history'; // кнопка «+» только на «Операциях»
 }
 document.querySelectorAll('.tab').forEach((t) => (t.onclick = () => showView(t.dataset.view)));
 document.querySelectorAll('[data-go]').forEach((b) => (b.onclick = () => showView(b.dataset.go)));
@@ -72,7 +84,7 @@ glassBox.onchange = () => {
 
 $('clear-data').onclick = () => {
   if (confirm('Удалить ВСЕ данные? Действие необратимо.')) {
-    ['fin_transactions', 'fin_investments', 'fin_categories', 'fin_autopays'].forEach((k) => localStorage.removeItem(k));
+    ['fin_transactions', 'fin_investments', 'fin_categories', 'fin_autopays', 'fin_accounts'].forEach((k) => localStorage.removeItem(k));
     location.reload();
   }
 };
@@ -93,15 +105,17 @@ function runPays() {
 
 // ---------- Модальное окно ----------
 const modal = $('modal');
-let editing = null;    // id редактируемой инвестиции
-let editingTx = null;  // id редактируемой операции
+let editing = null;      // id редактируемой инвестиции
+let editingTx = null;    // id редактируемой операции
+let editingAcc = null;   // id редактируемого счёта
 
 function openModal(kind) {
-  ['tx', 'inv', 'cat', 'pay'].forEach((k) => ($(`${k}-form`).hidden = k !== kind));
+  ['tx', 'inv', 'cat', 'pay', 'acc'].forEach((k) => ($(`${k}-form`).hidden = k !== kind));
   modal.classList.add('open');
   document.body.style.overflow = 'hidden'; // фон не скроллится, пока открыто окно
-  if (kind === 'tx' && editingTx === null) { $('tx-date').value = todayISO(); fillCat(); }
-  if (kind === 'cat') { setSeg($('cat-form'), 'expense'); pickEmoji('🍔'); $('cat-emoji').value = ''; }
+  if (kind === 'tx' && editingTx === null) { $('tx-date').value = todayISO(); fillCat(); fillAcc(); }
+  if (kind === 'cat') { setSeg($('cat-form'), 'expense'); pickEmoji($('cat-form'), '🍔'); $('cat-emoji').value = ''; }
+  if (kind === 'acc') { pickEmoji($('acc-form'), '💵'); $('acc-emoji').value = ''; }
 }
 function closeModal() {
   modal.classList.remove('open');
@@ -109,11 +123,9 @@ function closeModal() {
   document.querySelectorAll('.sheet form').forEach((f) => f.reset());
   editing = null;
   editingTx = null;
+  editingAcc = null;
 }
-$('fab').onclick = () => {
-  const v = document.querySelector('.view.active').id.slice(5);
-  openModal({ overview: 'tx', history: 'tx', analytics: 'tx', investments: 'inv', categories: 'cat', autopays: 'pay' }[v]);
-};
+$('fab').onclick = () => openModal('tx');
 modal.onclick = (e) => { if (e.target === modal) closeModal(); };
 document.querySelectorAll('.cancel').forEach((b) => (b.onclick = closeModal));
 
@@ -133,17 +145,31 @@ function fillCat() {
   $('tx-category').innerHTML = cats[$('tx-form').dataset.type]
     .map((c) => `<option value="${esc(c.name)}">${c.icon} ${esc(c.name)}</option>`).join('');
 }
-
-// Выбор иконки категории
-const EMOJIS = ['🍔','🛒','🚌','🏠','🎬','💊','👕','✈️','🎓','🐾','💼','💻','🎁','✨','📦','💳'];
-$('emoji-row').innerHTML = EMOJIS.map((e) => `<button type="button">${e}</button>`).join('');
-function pickEmoji(e) {
-  $('cat-form').dataset.icon = e;
-  $('emoji-row').querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.textContent === e));
+function fillAcc() {
+  $('tx-account').innerHTML = accounts
+    .map((a) => `<option value="${a.id}">${a.icon} ${esc(a.name)}</option>`).join('');
 }
-$('emoji-row').onclick = (e) => { if (e.target.tagName === 'BUTTON') { pickEmoji(e.target.textContent); $('cat-emoji').value = ''; } };
-// Свой эмодзи с клавиатуры
-$('cat-emoji').addEventListener('input', (e) => { const v = e.target.value.trim(); if (v) pickEmoji(v); });
+
+// Выбор иконки (для категорий и счетов)
+const EMOJIS = ['🍔','🛒','🚌','🏠','🎬','💊','👕','✈️','🎓','🐾','💼','💻','🎁','✨','📦','💳'];
+const ACC_EMOJIS = ['💵','💳','🏦','🪙','📈','💎'];
+const renderEmojiRow = (el, list) => (el.innerHTML = list.map((e) => `<button type="button">${e}</button>`).join(''));
+renderEmojiRow($('emoji-row'), EMOJIS);
+renderEmojiRow($('acc-emoji-row'), ACC_EMOJIS);
+
+function pickEmoji(form, e) {
+  form.dataset.icon = e;
+  form.querySelectorAll('.emoji-row button').forEach((b) => b.classList.toggle('on', b.textContent === e));
+}
+document.querySelectorAll('.emoji-row').forEach((row) => (row.onclick = (e) => {
+  if (e.target.tagName !== 'BUTTON') return;
+  pickEmoji(row.closest('form'), e.target.textContent);
+  row.closest('form').querySelector('.emoji-input').value = '';
+}));
+document.querySelectorAll('.emoji-input').forEach((inp) => (inp.oninput = (e) => {
+  const v = e.target.value.trim();
+  if (v) pickEmoji(inp.closest('form'), v);
+}));
 
 // Шторка: закрытие перетягиванием вниз (за верхнюю часть окна)
 const sheetEl = document.querySelector('.sheet');
@@ -176,8 +202,10 @@ function editTx(id) {
   openModal('tx');
   setSeg($('tx-form'), t.type);
   fillCat();
+  fillAcc();
   $('tx-amount').value = t.amount;
   $('tx-category').value = t.category;
+  $('tx-account').value = t.account || (accounts[0] && accounts[0].id);
   $('tx-note').value = t.note || '';
   $('tx-date').value = t.date;
 }
@@ -186,12 +214,33 @@ $('tx-form').onsubmit = (e) => {
   e.preventDefault();
   const d = {
     type: $('tx-form').dataset.type, amount: +$('tx-amount').value,
-    category: $('tx-category').value, note: $('tx-note').value.trim(), date: $('tx-date').value || todayISO(),
+    category: $('tx-category').value, account: +$('tx-account').value,
+    note: $('tx-note').value.trim(), date: $('tx-date').value || todayISO(),
   };
   if (editingTx) Object.assign(txs.find((t) => t.id === editingTx), d);
   else txs.push({ id: Date.now(), ...d });
   save(); renderAll(); closeModal();
 };
+
+// ---------- Счета ----------
+$('acc-form').onsubmit = (e) => {
+  e.preventDefault();
+  const d = { name: $('acc-name').value.trim(), start: +$('acc-start').value || 0, icon: $('acc-form').dataset.icon };
+  if (editingAcc) Object.assign(accounts.find((a) => a.id === editingAcc), d);
+  else accounts.push({ id: Date.now(), ...d });
+  save(); renderAll(); closeModal();
+};
+
+$('add-acc').onclick = () => openModal('acc');
+
+function editAcc(id) {
+  const a = accounts.find((x) => x.id === id);
+  editingAcc = a.id;
+  openModal('acc');
+  $('acc-name').value = a.name;
+  $('acc-start').value = a.start;
+  pickEmoji($('acc-form'), a.icon);
+}
 
 $('inv-form').onsubmit = (e) => {
   e.preventDefault();
@@ -212,10 +261,16 @@ $('pay-form').onsubmit = (e) => {
   save(); runPays(); renderAll(); closeModal();
 };
 
-// ---------- Рендер: ОБЗОР ----------
+// ---------- Рендер: ОБЗОР (счета) ----------
 function renderOverview() {
-  $('total-balance').textContent = fmt.format(txs.reduce((s, t) => s + (t.type === 'income' ? t.amount : -t.amount), 0));
+  $('total-balance').textContent = fmt.format(
+    accounts.reduce((s, a) => s + a.start, 0) +
+    txs.reduce((s, t) => s + (t.type === 'income' ? t.amount : -t.amount), 0)
+  );
+}
 
+// ---------- Рендер: АНАЛИТИКА ----------
+function renderAnalytics() {
   const m = month();
   let mi = 0, me = 0;
   const by = {};
@@ -233,16 +288,6 @@ function renderOverview() {
       <div class="bar-top"><span>${icon('expense', n)} ${esc(n)}</span><b>${fmt.format(s)}</b></div>
       <div class="track"><i style="width:${Math.round((s / en[0][1]) * 100)}%"></i></div>
     </div>`).join('') : '<div class="empty">Нет расходов в этом месяце</div>';
-
-  const si = invs.reduce((s, i) => s + i.invested, 0);
-  const sc = invs.reduce((s, i) => s + i.current, 0);
-  const pr = sc - si;
-  $('invest-summary').innerHTML = invs.length ? `
-    <div class="cols">
-      <div><small>Вложено</small><b>${fmt.format(si)}</b></div>
-      <div><small>Сейчас</small><b>${fmt.format(sc)}</b></div>
-      <div><small>Прибыль</small><b class="${pr >= 0 ? 'in' : 'out'}">${fmtSign(pr)} (${si ? ((pr / si) * 100).toFixed(1) : 0}%)</b></div>
-    </div>` : '<div class="empty">Нет инвестиций</div>';
 }
 
 // ---------- Рендер: ИСТОРИЯ ----------
@@ -282,6 +327,18 @@ function renderHistory() {
 // ---------- Рендер: ИНВЕСТИЦИИ ----------
 function renderInvestments() {
   const box = $('invest-list');
+
+  // Сводка
+  const si = invs.reduce((s, i) => s + i.invested, 0);
+  const sc = invs.reduce((s, i) => s + i.current, 0);
+  const pr = sc - si;
+  $('invest-summary').innerHTML = invs.length ? `
+    <div class="cols">
+      <div><small>Вложено</small><b>${fmt.format(si)}</b></div>
+      <div><small>Сейчас</small><b>${fmt.format(sc)}</b></div>
+      <div><small>Прибыль</small><b class="${pr >= 0 ? 'in' : 'out'}">${fmtSign(pr)} (${si ? ((pr / si) * 100).toFixed(1) : 0}%)</b></div>
+    </div>` : '<div class="empty">Нет инвестиций</div>';
+
   if (!invs.length) { box.innerHTML = '<div class="empty">Инвестиций нет. Нажми «+», чтобы добавить</div>'; return; }
 
   box.innerHTML = invs.map((i) => {
@@ -369,10 +426,41 @@ if (!localStorage.getItem('fin_demo') && !txs.length && !invs.length && !pays.le
   save();
 }
 
+// ---------- Рендер: СЧЕТА (список) ----------
+function renderAccounts() {
+  const bal = (a) => a.start + txs.reduce((s, t) => t.account === a.id ? s + (t.type === 'income' ? t.amount : -t.amount) : s, 0);
+  $('account-list').innerHTML = accounts.map((a) => {
+    const b = bal(a);
+    return `
+      <div class="li tap" data-id="${a.id}">
+        <div class="ic">${a.icon}</div>
+        <div class="grow"><div class="name">${esc(a.name)}</div><div class="note">Баланс счёта</div></div>
+        <div class="amt ${b >= 0 ? 'in' : 'out'}">${fmt.format(b)}</div>
+        <button class="del" data-id="${a.id}">✕</button>
+      </div>`;
+  }).join('') || '<div class="empty">Счетов нет</div>';
+
+  $('account-list').querySelectorAll('.del').forEach((bEl) => (bEl.onclick = (e) => {
+    e.stopPropagation();
+    const a = accounts.find((x) => x.id === +bEl.dataset.id);
+    if (accounts.length === 1) { alert('Должен остаться хотя бы один счёт'); return; }
+    if (confirm(`Удалить «${a.name}»? Его операции перейдут на другой счёт.`)) {
+      const other = accounts.find((x) => x.id !== a.id).id;
+      txs.forEach((t) => { if (t.account === a.id) t.account = other; });
+      accounts = accounts.filter((x) => x.id !== a.id);
+      save(); renderAll();
+    }
+  }));
+  $('account-list').querySelectorAll('.li.tap').forEach((row) => (row.onclick = (e) => {
+    if (e.target.closest('.del')) return;
+    editAcc(+row.dataset.id);
+  }));
+}
+
 // ---------- Запуск ----------
 $('add-cat').onclick = () => openModal('cat');
 $('add-pay').onclick = () => openModal('pay');
-function renderAll() { renderOverview(); renderHistory(); renderInvestments(); renderCats(); renderPays(); }
+function renderAll() { renderOverview(); renderAnalytics(); renderHistory(); renderInvestments(); renderCats(); renderPays(); renderAccounts(); }
 runPays();
 renderAll();
 showView('overview');

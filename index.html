@@ -22,10 +22,11 @@
   <section id="view-overview" class="view">
     <h1 class="title">Счета</h1>
     <div class="card balance">
-      <div class="lbl">Баланс</div>
+      <div class="lbl">Общий баланс</div>
       <div class="big" id="total-balance">0 ₽</div>
     </div>
-    <div class="card"><div class="h2">Инвестиции</div><div id="invest-summary"></div></div>
+    <div class="card list" id="account-list"></div>
+    <button class="btn primary block" id="add-acc">Добавить счёт</button>
   </section>
 
   <section id="view-analytics" class="view">
@@ -44,6 +45,7 @@
 
   <section id="view-investments" class="view">
     <h1 class="title">Инвестиции</h1>
+    <div class="card"><div class="h2">Сводка</div><div id="invest-summary"></div></div>
     <div id="invest-list"></div>
   </section>
 
@@ -117,6 +119,7 @@
       </div>
       <label>Сумма<input type="number" id="tx-amount" inputmode="decimal" min="0" step="0.01" placeholder="0" required></label>
       <label>Категория<select id="tx-category"></select></label>
+      <label>Счёт<select id="tx-account"></select></label>
       <label>Комментарий<input type="text" id="tx-note" maxlength="60" placeholder="необязательно"></label>
       <label>Дата<input type="date" id="tx-date" required></label>
       <div class="actions"><button type="button" class="btn ghost cancel">Отмена</button><button type="submit" class="btn primary">Сохранить</button></div>
@@ -137,8 +140,17 @@
         <button type="button" class="seg-btn" data-type="income">Доход</button>
       </div>
       <label>Название<input type="text" id="cat-name" maxlength="20" placeholder="Например: Спорт" required></label>
-      <div id="emoji-row"></div>
-      <label>Или свой эмодзи с клавиатуры<input type="text" id="cat-emoji" maxlength="8" placeholder="Вставь или набери любой эмодзи"></label>
+      <div id="emoji-row" class="emoji-row"></div>
+      <label>Или свой эмодзи с клавиатуры<input type="text" id="cat-emoji" class="emoji-input" maxlength="8" placeholder="Вставь или набери любой эмодзи"></label>
+      <div class="actions"><button type="button" class="btn ghost cancel">Отмена</button><button type="submit" class="btn primary">Сохранить</button></div>
+    </form>
+
+    <form id="acc-form" hidden>
+      <div class="h2">Счёт</div>
+      <label>Название<input type="text" id="acc-name" maxlength="20" placeholder="Например: Наличные" required></label>
+      <label>Начальный остаток, ₽<input type="number" id="acc-start" inputmode="decimal" step="0.01" placeholder="0"></label>
+      <div id="acc-emoji-row" class="emoji-row"></div>
+      <label>Или свой эмодзи с клавиатуры<input type="text" id="acc-emoji" class="emoji-input" maxlength="8" placeholder="Вставь или набери любой эмодзи"></label>
       <div class="actions"><button type="button" class="btn ghost cancel">Отмена</button><button type="submit" class="btn primary">Сохранить</button></div>
     </form>
 
