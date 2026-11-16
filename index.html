@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1420">
+  <title>Мои Финансы</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ==================== ЭКРАН «ОБЗОР» ==================== -->
+  <section id="view-overview" class="view active">
+
+    <div class="balance-card">
+      <div class="balance-label">Общий баланс</div>
+      <div class="balance-value" id="total-balance">0 ₽</div>
+      <div class="balance-hint">доходы минус расходы за всё время</div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card stat income">
+        <div class="stat-label">Доходы в этом месяце</div>
+        <div class="stat-value" id="month-income">0 ₽</div>
+      </div>
+      <div class="card stat expense">
+        <div class="stat-label">Расходы в этом месяце</div>
+        <div class="stat-value" id="month-expense">0 ₽</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Расходы по категориям <span class="muted">(месяц)</span></div>
+      <div id="category-bars" class="category-bars">
+        <div class="empty">Пока нет расходов в этом месяце</div>
+      </div>
+    </div>
+
+    <div class="card" id="invest-summary-card">
+      <div class="card-title">Инвестиции</div>
+      <div class="invest-summary" id="invest-summary">
+        <div class="empty">Пока нет инвестиций</div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ==================== ЭКРАН «ИСТОРИЯ» ==================== -->
+  <section id="view-history" class="view">
+    <h2 class="view-title">История операций</h2>
+    <div id="history-list"></div>
+  </section>
+
+  <!-- ==================== ЭКРАН «ИНВЕСТИЦИИ» ==================== -->
+  <section id="view-investments" class="view">
+    <h2 class="view-title">Инвестиции</h2>
+    <div id="invest-list"></div>
+  </section>
+
+  <!-- ==================== КНОПКА «+» ==================== -->
+  <button id="fab" aria-label="Добавить">+</button>
+
+  <!-- ==================== НИЖНЕЕ МЕНЮ ==================== -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-view="overview">📊<span>Обзор</span></button>
+    <button class="nav-btn" data-view="history">📝<span>История</span></button>
+    <button class="nav-btn" data-view="investments">📈<span>Инвестиции</span></button>
+  </nav>
+
+  <!-- ==================== МОДАЛЬНОЕ ОКНО ==================== -->
+  <div class="modal-backdrop" id="modal">
+    <div class="modal">
+
+      <!-- Форма дохода/расхода -->
+      <form id="tx-form" class="tx-form">
+        <div class="type-switch">
+          <button type="button" class="type-btn active" data-type="expense">Расход</button>
+          <button type="button" class="type-btn" data-type="income">Доход</button>
+        </div>
+
+        <label>Сумма
+          <input type="number" id="tx-amount" inputmode="decimal" min="0" step="0.01" placeholder="0" required>
+        </label>
+
+        <label>Категория
+          <select id="tx-category"></select>
+        </label>
+
+        <label>Комментарий
+          <input type="text" id="tx-note" maxlength="60" placeholder="необязательно">
+        </label>
+
+        <label>Дата
+          <input type="date" id="tx-date" required>
+        </label>
+
+        <div class="modal-actions">
+          <button type="button" class="btn ghost" id="tx-cancel">Отмена</button>
+          <button type="submit" class="btn primary">Сохранить</button>
+        </div>
+      </form>
+
+      <!-- Форма инвестиции -->
+      <form id="inv-form" class="inv-form" hidden>
+        <div class="card-title">Инвестиция</div>
+
+        <label>Название (акция, вклад, монета…)
+          <input type="text" id="inv-name" maxlength="40" placeholder="Например: S&P 500" required>
+        </label>
+
+        <label>Сколько вложено, ₽
+          <input type="number" id="inv-invested" inputmode="decimal" min="0" step="0.01" placeholder="0" required>
+        </label>
+
+        <label>Текущая стоимость, ₽
+          <input type="number" id="inv-current" inputmode="decimal" min="0" step="0.01" placeholder="0" required>
+        </label>
+
+        <div class="modal-actions">
+          <button type="button" class="btn ghost" id="inv-cancel">Отмена</button>
+          <button type="submit" class="btn primary">Сохранить</button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
