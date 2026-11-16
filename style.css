@@ -24,6 +24,43 @@
   --nav: rgba(249, 249, 249, .85);
 }
 
+/* ============ LIQUID GLASS (прозрачность + размытие) ============ */
+:root.glass {
+  --card: rgba(34, 34, 40, .58);
+  --field: rgba(120, 120, 128, .16);
+  --nav: rgba(10, 10, 14, .5);
+}
+:root[data-theme="light"].glass {
+  --card: rgba(255, 255, 255, .6);
+  --field: rgba(120, 120, 128, .13);
+  --nav: rgba(249, 249, 249, .55);
+}
+.glass .card, .glass .tabs, .glass .sheet, .glass #fab {
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+}
+.glass .sheet { background: rgba(38, 38, 44, .85); }
+:root[data-theme="light"].glass .sheet { background: rgba(255, 255, 255, .82); }
+.glass .balance { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .22), 0 12px 32px rgba(79, 70, 229, .35); }
+
+/* Фоновые цветные пятна — то, что «размывает» стекло */
+body::before, body::after {
+  content: ''; position: fixed; z-index: -1; border-radius: 50%;
+  pointer-events: none; opacity: .55;
+}
+body::before {
+  width: 65vmax; height: 65vmax; top: -22vmax; right: -18vmax;
+  background: radial-gradient(circle, #4f46e5, transparent 70%);
+  animation: float 26s ease-in-out infinite alternate;
+}
+body::after {
+  width: 55vmax; height: 55vmax; bottom: -18vmax; left: -18vmax;
+  background: radial-gradient(circle, #db2777, transparent 70%);
+  animation: float 34s ease-in-out infinite alternate-reverse;
+}
+:root[data-theme="light"] body::before, :root[data-theme="light"] body::after { opacity: .28; }
+@keyframes float { to { transform: translate(-7vmax, 7vmax); } }
+
 /* ============ БАЗА ============ */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 [hidden] { display: none !important; }
@@ -51,8 +88,15 @@ body {
 .back { color: var(--acc); background: none; border: none; font-size: 17px; padding: 14px 4px 0; cursor: pointer; }
 
 /* ============ КАРТОЧКИ ============ */
-.card { background: var(--card); border-radius: 16px; padding: 16px; margin-bottom: 14px; transition: background .3s; }
-.balance { background: linear-gradient(135deg, var(--acc), #5e5ce6); color: #fff; padding: 22px; }
+.card {
+  background: var(--card);
+  border-radius: 20px;
+  padding: 16px;
+  margin-bottom: 14px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, .16);
+  transition: background .3s;
+}
+.balance { background: linear-gradient(135deg, var(--acc), #5e5ce6 60%, #bf5af2); color: #fff; padding: 22px; }
 .balance .lbl { color: rgba(255, 255, 255, .8); }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .stat .big { margin-top: 6px; }
@@ -66,7 +110,7 @@ body {
 .bar { margin-bottom: 12px; }
 .bar-top { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 5px; }
 .bar-top b { font-weight: 600; }
-.track { height: 8px; background: var(--field); border-radius: 4px; overflow: hidden; }
+.track { height: 8px; background: rgba(120, 120, 128, .22); border-radius: 4px; overflow: hidden; }
 .track i { display: block; height: 100%; border-radius: 4px;
   background: linear-gradient(90deg, var(--acc), #5e5ce6); transition: width .4s ease; }
 
@@ -74,13 +118,13 @@ body {
 .card.list { padding: 0; overflow: hidden; }
 .li, .row {
   display: flex; align-items: center; gap: 12px;
-  padding: 11px 16px; width: 100%;
+  padding: 12px 16px; width: 100%;
   background: none; border: none; font: inherit; color: var(--text);
   text-align: left; text-decoration: none; cursor: pointer;
 }
 .card.list .li, .card.list .row { border-top: 1px solid var(--sep); }
 .card.list .li:first-child, .card.list .row:first-child, .card.list .sec + .li, .card.list .sec + .row { border-top: none; }
-.row:active, .li:active { background: rgba(120, 120, 128, .1); }
+.row:active, .li:active { background: rgba(120, 120, 128, .12); }
 .sec { padding: 12px 16px 6px; color: var(--muted); font-size: 13px; }
 .grow { flex: 1; min-width: 0; }
 .name { font-size: 16px; }
@@ -90,7 +134,7 @@ body {
 .ic {
   width: 34px; height: 34px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  background: var(--field); border-radius: 9px; font-size: 17px;
+  background: var(--field); border-radius: 10px; font-size: 17px;
 }
 .del { border: none; background: none; color: var(--muted); font-size: 16px; padding: 8px; cursor: pointer; }
 .del:active { color: var(--red); }
@@ -109,10 +153,10 @@ body {
 .switch input:checked + i::after { transform: translateX(20px); }
 
 /* ============ КНОПКИ ============ */
-.btn { border: none; border-radius: 12px; padding: 14px; font-size: 16px; font-weight: 600; cursor: pointer; transition: transform .1s; }
+.btn { border: none; border-radius: 14px; padding: 14px; font-size: 16px; font-weight: 600; cursor: pointer; transition: transform .1s; }
 .btn:active { transform: scale(.97); }
 .primary { background: var(--acc); color: #fff; }
-.ghost { background: var(--field); color: var(--text); }
+.ghost { background: rgba(120, 120, 128, .18); color: var(--text); }
 .block { width: 100%; margin-top: 14px; }
 
 /* ============ FAB и НИЖНЕЕ МЕНЮ ============ */
@@ -120,7 +164,7 @@ body {
   position: fixed; right: 18px; bottom: 92px; z-index: 20;
   width: 58px; height: 58px; border-radius: 50%; border: none;
   background: var(--acc); color: #fff; font-size: 30px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, .35);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .35);
   cursor: pointer; transition: transform .15s;
 }
 #fab:active { transform: scale(.9); }
@@ -150,9 +194,11 @@ body {
 .sheet {
   background: var(--card);
   width: 100%; max-width: 640px;
-  border-radius: 20px 20px 0 0;
+  border-radius: 24px 24px 0 0;
   padding: 12px 20px calc(24px + env(safe-area-inset-bottom));
   animation: sheet .3s cubic-bezier(.32, .72, 0, 1);
+  transition: transform .3s cubic-bezier(.32, .72, 0, 1);
+  overscroll-behavior: contain;
 }
 @keyframes sheet { from { transform: translateY(100%); } }
 .sheet::before {
@@ -189,5 +235,5 @@ input:focus, select:focus { box-shadow: 0 0 0 2px var(--acc); }
 /* На широких экранах — окно по центру */
 @media (min-width: 640px) {
   .sheet-back { align-items: center; padding: 20px; }
-  .sheet { border-radius: 20px; }
+  .sheet { border-radius: 24px; }
 }

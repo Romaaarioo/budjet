@@ -9,9 +9,10 @@
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style.css">
   <script>
-    // Тема применяется до отрисовки страницы, чтобы не «мигало»
+    // Тема и Liquid Glass применяются до отрисовки, чтобы не «мигало»
     const t = localStorage.getItem('fin_theme') || 'dark';
     document.documentElement.dataset.theme = t;
+    document.documentElement.classList.toggle('glass', localStorage.getItem('fin_glass') !== 'false');
     document.querySelector('meta[name=theme-color]').content = t === 'light' ? '#f2f2f7' : '#000000';
   </script>
 </head>
@@ -19,7 +20,7 @@
 <main>
 
   <section id="view-overview" class="view">
-    <h1 class="title">Обзор</h1>
+    <h1 class="title">Счета</h1>
     <div class="card balance">
       <div class="lbl">Баланс</div>
       <div class="big" id="total-balance">0 ₽</div>
@@ -33,7 +34,7 @@
   </section>
 
   <section id="view-history" class="view">
-    <h1 class="title">История</h1>
+    <h1 class="title">Операции</h1>
     <div id="history-list"></div>
   </section>
 
@@ -51,6 +52,9 @@
     <div class="card list">
       <label class="row"><span class="ic">🌙</span>Тёмная тема
         <span class="switch"><input type="checkbox" id="theme-toggle" checked><i></i></span>
+      </label>
+      <label class="row"><span class="ic">💎</span>Liquid Glass
+        <span class="switch"><input type="checkbox" id="glass-toggle" checked><i></i></span>
       </label>
     </div>
     <div class="card list">
@@ -79,11 +83,11 @@
 <nav class="tabs">
   <button class="tab active" data-view="overview">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg>
-    <span>Обзор</span>
+    <span>Счета</span>
   </button>
   <button class="tab" data-view="history">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-    <span>История</span>
+    <span>Операции</span>
   </button>
   <button class="tab" data-view="investments">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 7-7"/><path d="M14 8h6v6"/></svg>
@@ -126,6 +130,7 @@
       </div>
       <label>Название<input type="text" id="cat-name" maxlength="20" placeholder="Например: Спорт" required></label>
       <div id="emoji-row"></div>
+      <label>Или свой эмодзи с клавиатуры<input type="text" id="cat-emoji" maxlength="8" placeholder="Вставь или набери любой эмодзи"></label>
       <div class="actions"><button type="button" class="btn ghost cancel">Отмена</button><button type="submit" class="btn primary">Сохранить</button></div>
     </form>
 

@@ -63,8 +63,18 @@ themeBox.onchange = () => {
   document.querySelector('meta[name=theme-color]').content = t === 'light' ? '#f2f2f7' : '#000000';
 };
 
+const glassBox = $('glass-toggle');
+glassBox.checked = localStorage.getItem('fin_glass') !== 'false';
+glassBox.onchange = () => {
+  document.documentElement.classList.toggle('glass', glassBox.checked);
+  localStorage.setItem('fin_glass', glassBox.checked);
+};
+
 $('clear-data').onclick = () => {
-  if (confirm('Удалить ВСЕ данные? Действие необратимо.')) { localStorage.clear(); location.reload(); }
+  if (confirm('Удалить ВСЕ данные? Действие необратимо.')) {
+    ['fin_transactions', 'fin_investments', 'fin_categories', 'fin_autopays'].forEach((k) => localStorage.removeItem(k));
+    location.reload();
+  }
 };
 
 // ---------- Автоплатежи: списание при запуске ----------
@@ -88,11 +98,13 @@ let editing = null; // id редактируемой инвестиции
 function openModal(kind) {
   ['tx', 'inv', 'cat', 'pay'].forEach((k) => ($(`${k}-form`).hidden = k !== kind));
   modal.classList.add('open');
+  document.body.style.overflow = 'hidden'; // фон не скроллится, пока открыто окно
   if (kind === 'tx') { $('tx-date').value = todayISO(); fillCat(); }
-  if (kind === 'cat') { setSeg($('cat-form'), 'expense'); pickEmoji('🍔'); }
+  if (kind === 'cat') { setSeg($('cat-form'), 'expense'); pickEmoji('🍔'); $('cat-emoji').value = ''; }
 }
 function closeModal() {
   modal.classList.remove('open');
+  document.body.style.overflow = '';
   document.querySelectorAll('.sheet form').forEach((f) => f.reset());
   editing = null;
 }
@@ -127,7 +139,32 @@ function pickEmoji(e) {
   $('cat-form').dataset.icon = e;
   $('emoji-row').querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.textContent === e));
 }
-$('emoji-row').onclick = (e) => { if (e.target.tagName === 'BUTTON') pickEmoji(e.target.textContent); };
+$('emoji-row').onclick = (e) => { if (e.target.tagName === 'BUTTON') { pickEmoji(e.target.textContent); $('cat-emoji').value = ''; } };
+// Свой эмодзи с клавиатуры
+$('cat-emoji').addEventListener('input', (e) => { const v = e.target.value.trim(); if (v) pickEmoji(v); });
+
+// Шторка: закрытие перетягиванием вниз (за верхнюю часть окна)
+const sheetEl = document.querySelector('.sheet');
+let dragY = null, lastDy = 0;
+sheetEl.addEventListener('touchstart', (e) => {
+  lastDy = 0;
+  if (e.touches[0].clientY - sheetEl.getBoundingClientRect().top > 56) { dragY = null; return; }
+  dragY = e.touches[0].clientY;
+  sheetEl.style.transition = 'none';
+}, { passive: true });
+sheetEl.addEventListener('touchmove', (e) => {
+  if (dragY === null) return;
+  e.preventDefault();
+  lastDy = Math.max(0, e.touches[0].clientY - dragY);
+  sheetEl.style.transform = `translateY(${lastDy}px)`;
+}, { passive: false });
+sheetEl.addEventListener('touchend', () => {
+  if (dragY === null) return;
+  sheetEl.style.transition = '';
+  sheetEl.style.transform = '';
+  if (lastDy > 100) closeModal();
+  dragY = null;
+});
 
 // ---------- Сохранение форм ----------
 $('tx-form').onsubmit = (e) => {
@@ -278,6 +315,36 @@ function renderPays() {
   $('autopay-list').querySelectorAll('.del').forEach((b) => (b.onclick = () => {
     if (confirm('Удалить автоплатёж?')) { pays = pays.filter((p) => p.id != b.dataset.id); save(); renderAll(); }
   }));
+}
+
+// ---------- Демо-данные для наглядности (показываются один раз, если приложение пустое) ----------
+if (!localStorage.getItem('fin_demo') && !txs.length && !invs.length && !pays.length) {
+  localStorage.setItem('fin_demo', '1');
+  const ago = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+  txs = [
+    { id: 1,  type: 'income',  amount: 85000, category: 'Зарплата',   note: 'Зарплата за месяц',     date: ago(13) },
+    { id: 2,  type: 'income',  amount: 15000, category: 'Фриланс',    note: 'Лендинг для клиента',   date: ago(5) },
+    { id: 3,  type: 'income',  amount: 3000,  category: 'Подарки',    note: 'На день рождения',      date: ago(8) },
+    { id: 4,  type: 'expense', amount: 30000, category: 'Жильё',      note: 'Аренда квартиры',       date: ago(15) },
+    { id: 5,  type: 'expense', amount: 2340,  category: 'Продукты',   note: 'Лента',                 date: ago(1) },
+    { id: 6,  type: 'expense', amount: 890,   category: 'Продукты',   note: 'Магнит',                date: ago(2) },
+    { id: 7,  type: 'expense', amount: 1250,  category: 'Продукты',   note: 'Пятёрочка',             date: ago(4) },
+    { id: 8,  type: 'expense', amount: 350,   category: 'Транспорт',  note: 'Метро',                 date: ago(2) },
+    { id: 9,  type: 'expense', amount: 1800,  category: 'Развлечения',note: 'Кино и попкорн',        date: ago(1) },
+    { id: 10, type: 'expense', amount: 950,   category: 'Здоровье',   note: 'Аптека',                date: ago(6) },
+    { id: 11, type: 'expense', amount: 700,   category: 'Автоплатёж', note: 'Интернет',              date: ago(11) },
+    { id: 12, type: 'expense', amount: 520,   category: 'Другое',     note: 'Подписка на музыку',    date: ago(7) },
+  ];
+  invs = [
+    { id: 21, name: 'S&P 500',       invested: 50000,  current: 54500 },
+    { id: 22, name: 'Золото',        invested: 30000,  current: 28450 },
+    { id: 23, name: 'Вклад в банке', invested: 100000, current: 103400 },
+  ];
+  pays = [
+    { id: 31, name: 'Интернет',        amount: 700, day: 5,  lastRun: month() },
+    { id: 32, name: 'Мобильная связь', amount: 450, day: 20, lastRun: null },
+  ];
+  save();
 }
 
 // ---------- Запуск ----------
