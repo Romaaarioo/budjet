@@ -41,9 +41,15 @@
       <button type="button" class="seg-btn" data-mode="income">Доходы</button>
       <button type="button" class="seg-btn" data-mode="net">Доходы − расходы</button>
     </div>
-    <div class="card compact">
-      <div class="lbl" id="an-total-lbl">Расходы за месяц</div>
-      <div class="big sm" id="an-total">0 ₽</div>
+    <div class="card compact an-head">
+      <div>
+        <div class="lbl" id="an-total-lbl">Расходы за месяц</div>
+        <div class="big sm" id="an-total">0 ₽</div>
+      </div>
+      <div class="mini-seg" id="an-toggle">
+        <button type="button" id="an-view-list" class="on" aria-label="Список"></button>
+        <button type="button" id="an-view-chart" aria-label="Диаграмма"></button>
+      </div>
     </div>
     <div class="card compact"><div id="an-break"></div></div>
   </section>

@@ -44,6 +44,8 @@ const ICONS = {
   trash:   '<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>',
   tag:     '<path d="M12.6 2.6 21.4 11.4a2 2 0 0 1 0 2.8l-7.2 7.2a2 2 0 0 1-2.8 0L2.6 12.6V4a2 2 0 0 1 2-2z"/><circle cx="7.5" cy="7.5" r="1"/>',
   moon:    '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/>',
+  list:    '<path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/>',
+  pie:     '<path d="M21.2 15.9A10 10 0 1 1 8 2.8"/><path d="M22 12A10 10 0 0 0 12 2v10z"/>',
 };
 const svgIcon = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ICONS.sparkle}</svg>`;
 // иконка категории/счёта: ключ → SVG, иначе эмодзи
@@ -101,12 +103,55 @@ function formatDate(iso) {
   return `${d} ${M[m - 1]}` + (y !== new Date().getFullYear() ? ` ${y}` : '');
 }
 
+// ---------- Свайп строк: редактирование и удаление ----------
+let openSwipe = null;
+function closeSwipe(el) {
+  delete el.dataset.open;
+  el.querySelector('.li, .card').style.transform = 'translateX(0)';
+  if (openSwipe === el) openSwipe = null;
+}
+function bindSwipe(el, actions, onTap) {
+  const content = el.querySelector('.li, .card');
+  const w = actions.length * 52;
+
+  el.querySelector('.swipe-actions').innerHTML = actions.map((a, i) =>
+    `<button class="${a.cls}" data-i="${i}">${svgIcon(a.icon)}</button>`).join('');
+  el.querySelectorAll('.swipe-actions button').forEach((b) => (b.onclick = () => {
+    if (el.dataset.open) closeSwipe(el);
+    actions[+b.dataset.i].cb();
+  }));
+
+  let x0 = null, y0 = 0;
+  el.addEventListener('touchstart', (e) => {
+    if (openSwipe && openSwipe !== el) closeSwipe(openSwipe);
+    x0 = e.touches[0].clientX;
+    y0 = e.touches[0].clientY;
+    content.style.transition = 'none';
+  }, { passive: true });
+  el.addEventListener('touchmove', (e) => {
+    if (x0 === null) return;
+    const dx = e.touches[0].clientX - x0, dy = e.touches[0].clientY - y0;
+    if (Math.abs(dy) > Math.abs(dx)) return; // вертикальный скролл не двигает строку
+    content.style.transform = `translateX(${Math.max((el.dataset.open ? -w : 0) + dx, -w)}px)`;
+  }, { passive: true });
+  el.addEventListener('touchend', () => {
+    if (x0 === null) return;
+    content.style.transition = '';
+    const cur = parseFloat(content.style.transform.match(/-?[\d.]+/)) || 0;
+    if (cur < -w / 2) { el.dataset.open = '1'; content.style.transform = `translateX(${-w}px)`; openSwipe = el; }
+    else closeSwipe(el);
+    x0 = null;
+  });
+  content.onclick = () => { if (el.dataset.open) { closeSwipe(el); return; } if (onTap) onTap(); };
+}
+
 // ---------- Навигация ----------
 function showView(name) {
   document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.id === 'view-' + name));
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active',
     t.dataset.view === name || (t.dataset.view === 'more' && ['categories', 'autopays'].includes(name))));
   $('fab').hidden = name !== 'history'; // кнопка «+» только на «Операциях»
+  if (openSwipe) closeSwipe(openSwipe);
 }
 document.querySelectorAll('.tab').forEach((t) => (t.onclick = () => showView(t.dataset.view)));
 document.querySelectorAll('[data-go]').forEach((b) => (b.onclick = () => showView(b.dataset.go)));
@@ -202,11 +247,19 @@ sheetEl.addEventListener('touchend', () => {
   dragY = null;
 });
 
-// Сегментированные переключатели Расход/Доход (в формах)
+// Сегментированные переключатели
 function setSeg(form, type) {
   form.dataset.type = type;
   form.querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('on', b.dataset.type === type));
 }
+document.querySelectorAll('.seg').forEach((seg) => (seg.onclick = (e) => {
+  const b = e.target.closest('.seg-btn');
+  if (!b) return;
+  seg.querySelectorAll('.seg-btn').forEach((x) => x.classList.toggle('on', x === b));
+  const form = seg.closest('form');
+  if (form) { form.dataset.type = b.dataset.type; if (form.id === 'tx-form') fillCat(); }
+  else { anMode = b.dataset.mode; renderAnalytics(); }
+}));
 
 function fillCat() {
   $('tx-category').innerHTML = cats[$('tx-form').dataset.type]
@@ -336,50 +389,75 @@ function renderOverview() {
   $('account-list').innerHTML = accounts.map((a) => {
     const b = bal(a);
     return `
-      <div class="li tap" data-id="${a.id}">
-        <div class="ic">${renderIcon(a.icon)}</div>
-        <div class="grow"><div class="name">${esc(a.name)}</div><div class="note">Баланс счёта</div></div>
-        <div class="amt ${b >= 0 ? 'in' : 'out'}">${fmt.format(b)}</div>
-        <button class="del" data-id="${a.id}">✕</button>
+      <div class="swipe">
+        <div class="swipe-actions"></div>
+        <div class="li tap" data-id="${a.id}">
+          <div class="ic">${renderIcon(a.icon)}</div>
+          <div class="grow"><div class="name">${esc(a.name)}</div><div class="note">Баланс счёта</div></div>
+          <div class="amt ${b >= 0 ? 'in' : 'out'}">${fmt.format(b)}</div>
+        </div>
       </div>`;
   }).join('') || '<div class="empty">Счетов нет</div>';
 
-  $('account-list').querySelectorAll('.del').forEach((bEl) => (bEl.onclick = (e) => {
-    e.stopPropagation();
-    const a = accounts.find((x) => x.id === +bEl.dataset.id);
-    if (accounts.length === 1) { alert('Должен остаться хотя бы один счёт'); return; }
-    if (confirm(`Удалить «${a.name}»? Его операции перейдут на другой счёт.`)) {
-      const other = accounts.find((x) => x.id !== a.id).id;
-      txs.forEach((t) => { if (t.account === a.id) t.account = other; });
-      accounts = accounts.filter((x) => x.id !== a.id);
-      save(); renderAll();
-    }
-  }));
-  $('account-list').querySelectorAll('.li.tap').forEach((row) => (row.onclick = (e) => {
-    if (e.target.closest('.del')) return;
-    editAcc(+row.dataset.id);
-  }));
+  $('account-list').querySelectorAll('.swipe').forEach((el) => {
+    const aid = +el.querySelector('.li').dataset.id;
+    bindSwipe(el, [
+      { icon: 'pencil', cls: 'sw-edit', cb: () => editAcc(aid) },
+      { icon: 'trash', cls: 'sw-del', cb: () => deleteAccount(aid) },
+    ], () => editAcc(aid));
+  });
+}
+
+function deleteAccount(id) {
+  const a = accounts.find((x) => x.id === id);
+  if (accounts.length === 1) { alert('Должен остаться хотя бы один счёт'); return; }
+  if (confirm(`Удалить «${a.name}»? Его операции перейдут на другой счёт.`)) {
+    const other = accounts.find((x) => x.id !== id).id;
+    txs.forEach((t) => { if (t.account === id) t.account = other; });
+    accounts = accounts.filter((x) => x.id !== id);
+    save(); renderAll();
+  }
 }
 
 // ---------- Рендер: АНАЛИТИКА ----------
 let anMonth = month();   // отображаемый месяц ГГГГ-ММ
 let anMode = 'expense';  // expense | income | net
+let anView = 'list';     // list | chart
 
-document.querySelectorAll('.seg').forEach((seg) => (seg.onclick = (e) => {
-  const b = e.target.closest('.seg-btn');
-  if (!b) return;
-  seg.querySelectorAll('.seg-btn').forEach((x) => x.classList.toggle('on', x === b));
-  const form = seg.closest('form');
-  if (form) { form.dataset.type = b.dataset.type; if (form.id === 'tx-form') fillCat(); }
-  else { anMode = b.dataset.mode; renderAnalytics(); }
-}));
-$('month-prev').onclick = () => { shiftMonth(-1); };
-$('month-next').onclick = () => { shiftMonth(1); };
+$('month-prev').onclick = () => shiftMonth(-1);
+$('month-next').onclick = () => shiftMonth(1);
 function shiftMonth(d) {
   const [y, m] = anMonth.split('-').map(Number);
   const dt = new Date(y, m - 1 + d, 1);
   anMonth = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
   renderAnalytics();
+}
+$('an-view-list').innerHTML = svgIcon('list');
+$('an-view-chart').innerHTML = svgIcon('pie');
+$('an-view-list').onclick = () => { anView = 'list'; setAnSegUI(); renderAnalytics(); };
+$('an-view-chart').onclick = () => { anView = 'chart'; setAnSegUI(); renderAnalytics(); };
+function setAnSegUI() {
+  $('an-view-list').classList.toggle('on', anView === 'list');
+  $('an-view-chart').classList.toggle('on', anView === 'chart');
+}
+
+// Круговая диаграмма
+function donut(entries, total) {
+  const C = ['#0a84ff', '#ff9f0a', '#30d158', '#ff453a', '#bf5af2', '#64d2ff', '#ffd60a', '#ff6482', '#a2845e', '#8e8e93'];
+  let acc = 0;
+  const segs = entries.map(([n, s], i) => {
+    const f = (s / total) * 100;
+    const seg = `<circle r="15.915" cx="21" cy="21" fill="none" stroke="${C[i % C.length]}" stroke-width="5.5" stroke-dasharray="${f.toFixed(2)} ${(100 - f).toFixed(2)}" stroke-dashoffset="${(25 - acc).toFixed(2)}"/>`;
+    acc += f;
+    return seg;
+  }).join('');
+  return `<div class="donut-wrap"><svg viewBox="0 0 42 42" class="donut">${segs}<text x="21" y="24.5" text-anchor="middle" class="donut-t">${fmt.format(total)}</text></svg></div>` +
+    entries.map(([n, s], i) => `
+      <div class="legend">
+        <i style="background:${C[i % C.length]}"></i>
+        <span class="grow">${esc(n)}</span>
+        <span class="legend-v">${Math.round((s / total) * 100)}% · ${fmt.format(s)}</span>
+      </div>`).join('');
 }
 
 function renderAnalytics() {
@@ -398,6 +476,7 @@ function renderAnalytics() {
 
   // «Доходы − расходы»
   if (anMode === 'net') {
+    $('an-toggle').style.display = 'none';
     const net = mi - me;
     $('an-total-lbl').textContent = 'Доходы − расходы';
     $('an-total').textContent = fmtSign(net);
@@ -412,6 +491,7 @@ function renderAnalytics() {
   }
 
   // Расходы или Доходы по категориям
+  $('an-toggle').style.display = 'flex';
   const isExp = anMode === 'expense';
   const total = isExp ? me : mi;
   const by = isExp ? byE : byI;
@@ -420,11 +500,14 @@ function renderAnalytics() {
   $('an-total').className = 'big sm';
 
   const en = Object.entries(by).sort((a, b) => b[1] - a[1]);
-  $('an-break').innerHTML = en.length ? en.map(([n, s]) => `
-    <div class="bar">
-      <div class="bar-top"><span>${catIcon(isExp ? 'expense' : 'income', n)} ${esc(n)}</span><span><b>${fmt.format(s)}</b> <i class="pct">${Math.round((s / total) * 100)}%</i></span></div>
-      <div class="track"><i style="width:${Math.round((s / total) * 100)}%"></i></div>
-    </div>`).join('') : '<div class="empty">Нет данных за этот месяц</div>';
+  if (!en.length) { $('an-break').innerHTML = '<div class="empty">Нет данных за этот месяц</div>'; return; }
+  $('an-break').innerHTML = anView === 'chart'
+    ? donut(en, total)
+    : en.map(([n, s]) => `
+      <div class="bar">
+        <div class="bar-top"><span>${catIcon(isExp ? 'expense' : 'income', n)} ${esc(n)}</span><span><b>${fmt.format(s)}</b> <i class="pct">${Math.round((s / total) * 100)}%</i></span></div>
+        <div class="track"><i style="width:${Math.round((s / total) * 100)}%"></i></div>
+      </div>`).join('');
 }
 
 // ---------- Рендер: ОПЕРАЦИИ ----------
@@ -443,23 +526,24 @@ function renderHistory() {
     const inc = t.type === 'income';
     const acc = accounts.find((a) => a.id === t.account);
     html += `
-      <div class="li tap" data-id="${t.id}">
-        <div class="ic">${catIcon(t.type, t.category)}</div>
-        <div class="grow"><div class="name">${esc(t.category)}</div>${t.note ? `<div class="note">${esc(t.note)}</div>` : ''}${acc ? `<div class="note">${esc(acc.name)}</div>` : ''}</div>
-        <div class="amt ${inc ? 'in' : 'out'}">${inc ? '+' : '−'}${fmt.format(t.amount)}</div>
-        <button class="del" data-id="${t.id}">✕</button>
+      <div class="swipe">
+        <div class="swipe-actions"></div>
+        <div class="li tap" data-id="${t.id}">
+          <div class="ic">${catIcon(t.type, t.category)}</div>
+          <div class="grow"><div class="name">${esc(t.category)}</div>${t.note ? `<div class="note">${esc(t.note)}</div>` : ''}${acc ? `<div class="note">${esc(acc.name)}</div>` : ''}</div>
+          <div class="amt ${inc ? 'in' : 'out'}">${inc ? '+' : '−'}${fmt.format(t.amount)}</div>
+        </div>
       </div>`;
   }
   box.innerHTML = html + '</div>';
 
-  box.querySelectorAll('.del').forEach((b) => (b.onclick = (e) => {
-    e.stopPropagation();
-    if (confirm('Удалить операцию?')) { txs = txs.filter((t) => t.id != b.dataset.id); save(); renderAll(); }
-  }));
-  box.querySelectorAll('.li.tap').forEach((row) => (row.onclick = (e) => {
-    if (e.target.closest('.del')) return;
-    editTx(row.dataset.id);
-  }));
+  box.querySelectorAll('.swipe').forEach((el) => {
+    const tid = el.querySelector('.li').dataset.id;
+    bindSwipe(el, [
+      { icon: 'pencil', cls: 'sw-edit', cb: () => editTx(tid) },
+      { icon: 'trash', cls: 'sw-del', cb: () => { if (confirm('Удалить операцию?')) { txs = txs.filter((t) => t.id != tid); save(); renderAll(); } } },
+    ], () => editTx(tid));
+  });
 }
 
 // ---------- Рендер: ИНВЕСТИЦИИ ----------
@@ -482,27 +566,26 @@ function renderInvestments() {
   box.innerHTML = invs.map((i) => {
     const pr = i.current - i.invested, pct = i.invested ? ((pr / i.invested) * 100).toFixed(1) : 0;
     return `
-      <div class="card">
-        <div class="bar-top" style="margin-bottom:10px"><b style="font-size:16px">${esc(i.name)}</b><span>
-          <button class="del" data-a="edit" data-id="${i.id}">${svgIcon('pencil')}</button><button class="del" data-a="del" data-id="${i.id}">${svgIcon('trash')}</button></span></div>
-        <div class="cols">
-          <div><small>Вложено</small><b>${fmt.format(i.invested)}</b></div>
-          <div><small>Сейчас</small><b>${fmt.format(i.current)}</b></div>
-          <div><small>Прибыль</small><b class="${pr >= 0 ? 'in' : 'out'}">${fmtSign(pr)} (${pct}%)</b></div>
+      <div class="swipe inv-swipe">
+        <div class="swipe-actions"></div>
+        <div class="card inv" data-id="${i.id}">
+          <div class="name" style="margin-bottom:10px">${esc(i.name)}</div>
+          <div class="cols">
+            <div><small>Вложено</small><b>${fmt.format(i.invested)}</b></div>
+            <div><small>Сейчас</small><b>${fmt.format(i.current)}</b></div>
+            <div><small>Прибыль</small><b class="${pr >= 0 ? 'in' : 'out'}">${fmtSign(pr)} (${pct}%)</b></div>
+          </div>
         </div>
       </div>`;
   }).join('');
 
-  box.querySelectorAll('.del').forEach((b) => (b.onclick = () => {
-    const i = invs.find((x) => x.id === +b.dataset.id);
-    if (b.dataset.a === 'del') {
-      if (confirm(`Удалить «${i.name}»?`)) { invs = invs.filter((x) => x.id !== i.id); save(); renderAll(); }
-    } else {
-      editing = i.id;
-      openModal('inv');
-      $('inv-name').value = i.name; $('inv-invested').value = i.invested; $('inv-current').value = i.current;
-    }
-  }));
+  box.querySelectorAll('.swipe').forEach((el) => {
+    const iid = +el.querySelector('.card').dataset.id;
+    bindSwipe(el, [
+      { icon: 'pencil', cls: 'sw-edit', cb: () => { editing = iid; openModal('inv'); const i = invs.find((x) => x.id === iid); $('inv-name').value = i.name; $('inv-invested').value = i.invested; $('inv-current').value = i.current; } },
+      { icon: 'trash', cls: 'sw-del', cb: () => { const i = invs.find((x) => x.id === iid); if (confirm(`Удалить «${i.name}»?`)) { invs = invs.filter((x) => x.id !== iid); save(); renderAll(); } } },
+    ], () => { editing = iid; openModal('inv'); const i = invs.find((x) => x.id === iid); $('inv-name').value = i.name; $('inv-invested').value = i.invested; $('inv-current').value = i.current; });
+  });
 }
 
 // ---------- Рендер: КЭШБЭК ----------
@@ -514,48 +597,62 @@ function renderCashback() {
   $('cb-total').textContent = 'Всего: ' + fmt.format(sumAll);
 
   $('card-list').innerHTML = cards.length ? cards.map((c) => `
-    <div class="li tap" data-id="${c.id}">
-      <div class="ic">${svgIcon('card')}</div>
-      <div class="grow"><div class="name">${esc(c.name)}</div><div class="note">${c.pct}% · ${esc(c.cat)}</div></div>
-      <button class="del" data-id="${c.id}">✕</button>
+    <div class="swipe">
+      <div class="swipe-actions"></div>
+      <div class="li tap" data-id="${c.id}">
+        <div class="ic">${svgIcon('card')}</div>
+        <div class="grow"><div class="name">${esc(c.name)}</div><div class="note">${c.pct}% · ${esc(c.cat)}</div></div>
+      </div>
     </div>`).join('') : '<div class="empty">Карт нет. Добавь карту и её категорию кэшбэка</div>';
 
-  $('card-list').querySelectorAll('.del').forEach((b) => (b.onclick = (e) => {
-    e.stopPropagation();
-    if (confirm('Удалить карту из списка?')) { cards = cards.filter((c) => c.id !== +b.dataset.id); save(); renderAll(); }
-  }));
-  $('card-list').querySelectorAll('.li.tap').forEach((row) => (row.onclick = (e) => {
-    if (e.target.closest('.del')) return;
-    editCard(+row.dataset.id);
-  }));
+  $('card-list').querySelectorAll('.swipe').forEach((el) => {
+    const cid = +el.querySelector('.li').dataset.id;
+    bindSwipe(el, [
+      { icon: 'pencil', cls: 'sw-edit', cb: () => editCard(cid) },
+      { icon: 'trash', cls: 'sw-del', cb: () => { if (confirm('Удалить карту из списка?')) { cards = cards.filter((c) => c.id !== cid); save(); renderAll(); } } },
+    ], () => editCard(cid));
+  });
 }
 
 // ---------- Рендер: КАТЕГОРИИ и АВТОПЛАТЕЖИ ----------
 function renderCats() {
   const row = (c, t) => `
-    <div class="li">
-      <div class="ic">${renderIcon(c.icon)}</div><div class="grow name">${esc(c.name)}</div>
-      <button class="del" data-t="${t}" data-n="${esc(c.name)}">✕</button>
+    <div class="swipe">
+      <div class="swipe-actions"></div>
+      <div class="li" data-n="${esc(c.name)}">
+        <div class="ic">${renderIcon(c.icon)}</div><div class="grow name">${esc(c.name)}</div>
+      </div>
     </div>`;
   $('cat-list').innerHTML =
     '<div class="sec">Расходы</div>' + cats.expense.map((c) => row(c, 'expense')).join('') +
     '<div class="sec">Доходы</div>' + cats.income.map((c) => row(c, 'income')).join('');
-  $('cat-list').querySelectorAll('.del').forEach((b) => (b.onclick = () => {
-    cats[b.dataset.t] = cats[b.dataset.t].filter((c) => c.name !== b.dataset.n);
-    save(); renderAll();
-  }));
+  $('cat-list').querySelectorAll('.swipe').forEach((el) => {
+    const name = el.querySelector('.li').dataset.n;
+    bindSwipe(el, [
+      { icon: 'trash', cls: 'sw-del', cb: () => {
+        cats.expense = cats.expense.filter((c) => c.name !== name);
+        cats.income = cats.income.filter((c) => c.name !== name);
+        save(); renderAll();
+      } },
+    ]);
+  });
 }
 
 function renderPays() {
   $('autopay-list').innerHTML = pays.length ? pays.map((p) => `
-    <div class="li">
-      <div class="ic">${svgIcon('refresh')}</div>
-      <div class="grow"><div class="name">${esc(p.name)}</div><div class="note">${p.day}-го числа · ${fmt.format(p.amount)}</div></div>
-      <button class="del" data-id="${p.id}">✕</button>
+    <div class="swipe">
+      <div class="swipe-actions"></div>
+      <div class="li" data-id="${p.id}">
+        <div class="ic">${svgIcon('refresh')}</div>
+        <div class="grow"><div class="name">${esc(p.name)}</div><div class="note">${p.day}-го числа · ${fmt.format(p.amount)}</div></div>
+      </div>
     </div>`).join('') : '<div class="empty">Автоплатежей нет. Нажми «Добавить», чтобы настроить</div>';
-  $('autopay-list').querySelectorAll('.del').forEach((b) => (b.onclick = () => {
-    if (confirm('Удалить автоплатёж?')) { pays = pays.filter((p) => p.id != b.dataset.id); save(); renderAll(); }
-  }));
+  $('autopay-list').querySelectorAll('.swipe').forEach((el) => {
+    const pid = el.querySelector('.li').dataset.id;
+    bindSwipe(el, [
+      { icon: 'trash', cls: 'sw-del', cb: () => { if (confirm('Удалить автоплатёж?')) { pays = pays.filter((p) => p.id != pid); save(); renderAll(); } } },
+    ]);
+  });
 }
 
 // ---------- Запуск ----------

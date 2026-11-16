@@ -10,6 +10,7 @@
   --green: #30d158;
   --red: #ff453a;
   --nav: rgba(18, 18, 20, .85);
+  --li: #1c1c1e;
 }
 :root[data-theme="light"] {
   --bg: #f2f2f7;
@@ -22,6 +23,7 @@
   --green: #34c759;
   --red: #ff3b30;
   --nav: rgba(249, 249, 249, .85);
+  --li: #fff;
 }
 
 /* ============ LIQUID GLASS (прозрачность + размытие) ============ */
@@ -124,8 +126,10 @@ body {
   background: none; border: none; font: inherit; color: var(--text);
   text-align: left; text-decoration: none; cursor: pointer;
 }
-.card.list .li, .card.list .row { border-top: 1px solid var(--sep); }
-.card.list .li:first-child, .card.list .row:first-child, .card.list .sec + .li, .card.list .sec + .row { border-top: none; }
+.card.list .li, .card.list .row, .card.list .swipe { border-top: 1px solid var(--sep); }
+.card.list .swipe .li { border-top: none; }
+.card.list .li:first-child, .card.list .row:first-child, .card.list .sec + .li, .card.list .sec + .row,
+.card.list .swipe:first-child, .card.list .sec + .swipe { border-top: none; }
 .row:active, .li:active { background: rgba(120, 120, 128, .12); }
 .sec { padding: 12px 16px 6px; color: var(--muted); font-size: 13px; }
 .grow { flex: 1; min-width: 0; }
@@ -139,10 +143,25 @@ body {
   background: var(--field); border-radius: 10px; font-size: 17px;
 }
 .ic svg { width: 18px; height: 18px; color: var(--acc); }
-.del { border: none; background: none; color: var(--muted); font-size: 16px; padding: 8px; cursor: pointer; display: flex; align-items: center; }
-.del svg { width: 16px; height: 16px; }
-.del:active { color: var(--red); }
 .danger { color: var(--red); }
+
+/* ============ СВАЙП СТРОК (редактирование / удаление) ============ */
+.swipe { position: relative; overflow: hidden; }
+.swipe-actions {
+  position: absolute; inset: 0 0 0 auto;
+  display: flex; align-items: center; justify-content: flex-end; gap: 1px;
+  padding-right: 4px;
+}
+.sw-edit, .sw-del {
+  width: 48px; height: 48px; border: none; border-radius: 12px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  color: #fff;
+}
+.sw-edit { background: var(--acc); }
+.sw-del { background: var(--red); }
+.sw-edit svg, .sw-del svg { width: 20px; height: 20px; }
+.li { background: var(--li); transition: transform .25s ease; }
+.card { transition: background .3s, transform .25s ease; }
 
 /* ============ ПЕРЕКЛЮЧАТЕЛЬ (iOS switch) ============ */
 .switch { position: relative; width: 51px; height: 31px; flex-shrink: 0; }
@@ -259,3 +278,26 @@ input[type="date"] { min-width: 0; padding: 12px 8px; font-size: 15px; }
 .nav-arrow:disabled { opacity: .35; }
 .compact { padding: 14px 16px; }
 .compact .big.sm { font-size: 20px; }
+
+/* Шапка аналитики: итог + переключатель список/диаграмма */
+.an-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.mini-seg { display: flex; gap: 2px; background: var(--field); border-radius: 10px; padding: 3px; flex-shrink: 0; }
+.mini-seg button {
+  width: 34px; height: 30px; border: none; border-radius: 8px;
+  background: none; color: var(--muted); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.mini-seg button.on { background: var(--acc); color: #fff; }
+.mini-seg svg { width: 17px; height: 17px; }
+
+/* Круговая диаграмма */
+.donut-wrap { display: flex; justify-content: center; padding: 10px 0 16px; }
+.donut { width: 190px; height: 190px; transform: rotate(-90deg); }
+.donut-t { font-size: 4px; font-weight: 700; fill: var(--text); transform: rotate(90deg); transform-origin: 21px 21px; }
+.legend { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--sep); font-size: 14px; }
+.legend i { width: 11px; height: 11px; border-radius: 4px; flex-shrink: 0; }
+.legend-v { color: var(--muted); font-size: 13px; white-space: nowrap; }
+
+/* Свайп-карточки инвестиций */
+.inv-swipe .card { margin-bottom: 0; }
+.inv-swipe { margin-bottom: 14px; border-radius: 20px; }
