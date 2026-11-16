@@ -136,7 +136,9 @@ body {
   display: flex; align-items: center; justify-content: center;
   background: var(--field); border-radius: 10px; font-size: 17px;
 }
-.del { border: none; background: none; color: var(--muted); font-size: 16px; padding: 8px; cursor: pointer; }
+.ic svg { width: 18px; height: 18px; color: var(--acc); }
+.del { border: none; background: none; color: var(--muted); font-size: 16px; padding: 8px; cursor: pointer; display: flex; align-items: center; }
+.del svg { width: 16px; height: 16px; }
 .del:active { color: var(--red); }
 .danger { color: var(--red); }
 
@@ -181,7 +183,7 @@ body {
   background: none; border: none; color: var(--muted); cursor: pointer;
 }
 .tab svg { width: 24px; height: 24px; }
-.tab span { font-size: 10.5px; }
+.tab span { font-size: 10px; letter-spacing: -.2px; }
 .tab.active { color: var(--acc); }
 
 /* ============ МОДАЛЬНОЕ ОКНО (sheet) ============ */
@@ -226,8 +228,9 @@ input[type="date"] { min-width: 0; padding: 12px 8px; font-size: 15px; }
 
 /* Выбор иконки категории */
 #emoji-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
-#emoji-row button { width: 38px; height: 38px; border: none; border-radius: 10px; background: var(--field); font-size: 20px; cursor: pointer; }
-#emoji-row button.on { box-shadow: 0 0 0 2px var(--acc); }
+#emoji-row button, #acc-emoji-row button { width: 38px; height: 38px; border: none; border-radius: 10px; background: var(--field); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+#emoji-row button svg, #acc-emoji-row button svg { width: 20px; height: 20px; color: var(--text); }
+#emoji-row button.on, #acc-emoji-row button.on { box-shadow: 0 0 0 2px var(--acc); }
 
 /* Действия в модалке */
 .actions { display: flex; gap: 10px; margin-top: 4px; }

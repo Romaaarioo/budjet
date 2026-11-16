@@ -49,22 +49,34 @@
     <div id="invest-list"></div>
   </section>
 
+  <section id="view-cashback" class="view">
+    <h1 class="title">Кэшбэк</h1>
+    <div class="card balance">
+      <div class="lbl">Получено в этом месяце</div>
+      <div class="big" id="cb-month">0 ₽</div>
+      <div class="lbl" id="cb-total" style="margin-top:8px">Всего: 0 ₽</div>
+    </div>
+    <div class="card"><div class="h2">Карты и повышенный кэшбэк</div><div id="card-list"></div></div>
+    <button class="btn primary block" id="add-card">Добавить карту</button>
+    <button class="btn ghost block" id="add-cb">Отметить полученный кэшбэк</button>
+  </section>
+
   <section id="view-more" class="view">
     <h1 class="title">Ещё</h1>
     <div class="card list">
-      <button class="row" data-go="categories"><span class="ic">🏷️</span>Категории<span class="chev">›</span></button>
-      <button class="row" data-go="autopays"><span class="ic">🔄</span>Автоплатежи<span class="chev">›</span></button>
+      <button class="row" data-go="categories"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.6 2.6 21.4 11.4a2 2 0 0 1 0 2.8l-7.2 7.2a2 2 0 0 1-2.8 0L2.6 12.6V4a2 2 0 0 1 2-2z"/><circle cx="7.5" cy="7.5" r="1"/></svg></span>Категории<span class="chev">›</span></button>
+      <button class="row" data-go="autopays"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></span>Автоплатежи<span class="chev">›</span></button>
     </div>
     <div class="card list">
-      <label class="row"><span class="ic">🌙</span>Тёмная тема
+      <label class="row"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></svg></span>Тёмная тема
         <span class="switch"><input type="checkbox" id="theme-toggle" checked><i></i></span>
       </label>
-      <label class="row"><span class="ic">💎</span>Liquid Glass
+      <label class="row"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 13L2 9z"/><path d="M11 3 8 9l4 13 4-13-3-6z"/><path d="M2 9h20"/></svg></span>Liquid Glass
         <span class="switch"><input type="checkbox" id="glass-toggle" checked><i></i></span>
       </label>
     </div>
     <div class="card list">
-      <button class="row danger" id="clear-data"><span class="ic">🗑️</span>Очистить данные</button>
+      <button class="row danger" id="clear-data"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></span>Очистить данные</button>
     </div>
   </section>
 
@@ -102,6 +114,10 @@
   <button class="tab" data-view="analytics">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20v-8"/><path d="M12 20V5"/><path d="M19 20v-5"/></svg>
     <span>Аналитика</span>
+  </button>
+  <button class="tab" data-view="cashback">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 5 5 19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+    <span>Кэшбэк</span>
   </button>
   <button class="tab" data-view="more">
     <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
@@ -151,6 +167,22 @@
       <label>Начальный остаток, ₽<input type="number" id="acc-start" inputmode="decimal" step="0.01" placeholder="0"></label>
       <div id="acc-emoji-row" class="emoji-row"></div>
       <label>Или свой эмодзи с клавиатуры<input type="text" id="acc-emoji" class="emoji-input" maxlength="8" placeholder="Вставь или набери любой эмодзи"></label>
+      <div class="actions"><button type="button" class="btn ghost cancel">Отмена</button><button type="submit" class="btn primary">Сохранить</button></div>
+    </form>
+
+    <form id="card-form" hidden>
+      <div class="h2">Карта</div>
+      <label>Название<input type="text" id="cb-card-name" maxlength="20" placeholder="Например: Т-Банк" required></label>
+      <label>Категория повышенного кэшбэка<select id="cb-card-cat"></select></label>
+      <label>Процент<input type="number" id="cb-card-pct" inputmode="decimal" min="0" max="100" step="0.5" placeholder="5" required></label>
+      <div class="actions"><button type="button" class="btn ghost cancel">Отмена</button><button type="submit" class="btn primary">Сохранить</button></div>
+    </form>
+
+    <form id="cb-form" hidden>
+      <div class="h2">Полученный кэшбэк</div>
+      <label>Сумма, ₽<input type="number" id="cb-amount" inputmode="decimal" min="0" step="0.01" placeholder="0" required></label>
+      <label>Карта<select id="cb-card"></select></label>
+      <label>Дата<input type="date" id="cb-date" required></label>
       <div class="actions"><button type="button" class="btn ghost cancel">Отмена</button><button type="submit" class="btn primary">Сохранить</button></div>
     </form>
 
