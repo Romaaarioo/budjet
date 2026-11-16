@@ -176,6 +176,31 @@ glassBox.onchange = () => {
   localStorage.setItem('fin_glass', glassBox.checked);
 };
 
+const DATA_KEYS = ['fin_transactions', 'fin_investments', 'fin_categories', 'fin_autopays', 'fin_accounts', 'fin_cards', 'fin_cashback', 'fin_budgets'];
+$('export-data').onclick = () => {
+  const data = { app: 'moi-finansy', exported: new Date().toISOString() };
+  DATA_KEYS.forEach((k) => (data[k] = JSON.parse(localStorage.getItem(k) || 'null')));
+  const a = document.createElement('a');
+  const url = a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+  a.download = `finansy-${todayISO()}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+$('import-data').onclick = () => $('import-file').click();
+$('import-file').onchange = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if (data.app !== 'moi-finansy') throw new Error('not ours');
+    if (!confirm('Заменить все текущие данные данными из файла?')) return;
+    DATA_KEYS.forEach((k) => data[k] == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(data[k])));
+    location.reload();
+  } catch {
+    alert('Не удалось прочитать файл. Выбери файл, экспортированный из этого приложения');
+  }
+};
+
 $('clear-data').onclick = () => {
   if (confirm('Удалить ВСЕ данные? Действие необратимо.')) {
     ['fin_transactions', 'fin_investments', 'fin_categories', 'fin_autopays', 'fin_accounts', 'fin_cards', 'fin_cashback', 'fin_budgets'].forEach((k) => localStorage.removeItem(k));
@@ -209,7 +234,12 @@ function openModal(kind) {
   ['tx', 'inv', 'cat', 'pay', 'acc', 'card', 'cb', 'budget'].forEach((k) => ($(`${k}-form`).hidden = k !== kind));
   modal.classList.add('open');
   document.body.style.overflow = 'hidden'; // фон не скроллится, пока открыто окно
-  if (kind === 'tx' && editingTx === null) { $('tx-date').value = todayISO(); fillCat(); fillAcc(); syncTxForm(); }
+  if (kind === 'tx' && editingTx === null) {
+    setSeg($('tx-form'), 'expense');
+    $('tx-amount').value = ''; $('tx-note').value = '';
+    $('tx-date').value = todayISO(); fillCat(); fillAcc(); syncTxForm();
+    $('tx-repeat').hidden = !txs.length;
+  }
   if (kind === 'cat') { setSeg($('cat-form'), 'expense'); pickEmoji($('cat-form'), 'sparkle'); $('cat-emoji').value = ''; }
   if (kind === 'acc') { pickEmoji($('acc-form'), 'cash'); $('acc-emoji').value = ''; }
   if (kind === 'cb') { $('cb-date').value = todayISO(); fillCbCards(); }
@@ -281,6 +311,21 @@ function fillAcc() {
   $('tx-from').innerHTML = opts;
   $('tx-to').innerHTML = opts;
 }
+// Быстрые суммы и повтор последней операции
+$('tx-chips').innerHTML = [100, 300, 500, 1000, 5000].map((v) => `<button type="button" data-v="${v}">${v}</button>`).join('');
+$('tx-chips').onclick = (e) => {
+  const b = e.target.closest('button');
+  if (b) $('tx-amount').value = b.dataset.v;
+};
+$('tx-repeat').onclick = () => {
+  const last = [...txs].sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id)[0];
+  setSeg($('tx-form'), last.type);
+  fillAcc(); syncTxForm();
+  $('tx-amount').value = last.amount;
+  if (last.type === 'transfer') { $('tx-from').value = last.from; $('tx-to').value = last.to; $('tx-note').value = last.note || ''; }
+  else { fillCat(); $('tx-category').value = last.category; $('tx-account').value = last.account; $('tx-note').value = last.note || ''; }
+};
+
 // Показ полей: перевод — «откуда/куда», расход/доход — категория и счёт
 function syncTxForm() {
   const tr = $('tx-form').dataset.type === 'transfer';
@@ -614,11 +659,39 @@ function renderAnalytics() {
 }
 
 // ---------- Рендер: ОПЕРАЦИИ ----------
+let hFilter = 'all';   // all | expense | income | transfer
+let hQuery = '';
+
+$('h-search').oninput = (e) => { hQuery = e.target.value.trim().toLowerCase(); renderHistory(); };
+$('h-filter').onclick = (e) => {
+  const b = e.target.closest('.seg-btn');
+  if (!b) return;
+  hFilter = b.dataset.f;
+  $('h-filter').querySelectorAll('.seg-btn').forEach((x) => x.classList.toggle('on', x === b));
+  renderHistory();
+};
+
 function renderHistory() {
   const box = $('history-list');
-  if (!txs.length) { box.innerHTML = '<div class="empty">Операций нет. Нажми «+», чтобы добавить первую</div>'; return; }
+  if (!txs.length) { box.innerHTML = '<div class="empty">Операций нет. Нажми «+», чтобы добавить первую</div>'; $('h-sum').textContent = ''; return; }
 
-  const sorted = [...txs].sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
+  const acc0 = (id) => (accounts.find((a) => a.id === id) || {}).name || '';
+  const match = (t) => {
+    if (hFilter !== 'all' && t.type !== hFilter) return false;
+    if (!hQuery) return true;
+    const hay = [t.category, t.note, acc0(t.account), acc0(t.from), acc0(t.to), String(t.amount)].join(' ').toLowerCase();
+    return hay.includes(hQuery);
+  };
+  const shown = txs.filter(match);
+  const sumIn = shown.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const sumOut = shown.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  const sumTransfer = shown.filter((t) => t.type === 'transfer').reduce((s, t) => s + t.amount, 0);
+  $('h-sum').textContent = shown.length
+    ? `Найдено ${shown.length}: доходы ${fmt.format(sumIn)}, расходы ${fmt.format(sumOut)}, переводы ${fmt.format(sumTransfer)}`
+    : 'Ничего не найдено';
+  if (!shown.length) { box.innerHTML = '<div class="empty">Подходящих операций нет</div>'; return; }
+
+  const sorted = shown.sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
   let html = '', last = null;
   for (const t of sorted) {
     if (t.date !== last) {

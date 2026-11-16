@@ -7,7 +7,7 @@
   <title>Мои Финансы</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="style.css?v=10">
+  <link rel="stylesheet" href="style.css?v=11">
   <script>
     // Тема и Liquid Glass применяются до отрисовки, чтобы не «мигало»
     const t = localStorage.getItem('fin_theme') || 'dark';
@@ -57,6 +57,14 @@
 
   <section id="view-history" class="view">
     <h1 class="title">Операции</h1>
+    <input type="search" class="search" id="h-search" placeholder="Поиск: категория, комментарий, сумма">
+    <div class="seg" id="h-filter">
+      <button type="button" class="seg-btn on" data-f="all">Все</button>
+      <button type="button" class="seg-btn" data-f="expense">Расходы</button>
+      <button type="button" class="seg-btn" data-f="income">Доходы</button>
+      <button type="button" class="seg-btn" data-f="transfer">Переводы</button>
+    </div>
+    <div class="h-sum" id="h-sum"></div>
     <div id="history-list"></div>
   </section>
 
@@ -91,6 +99,11 @@
       <label class="row"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 13L2 9z"/><path d="M11 3 8 9l4 13 4-13-3-6z"/><path d="M2 9h20"/></svg></span>Liquid Glass
         <span class="switch"><input type="checkbox" id="glass-toggle" checked><i></i></span>
       </label>
+    </div>
+    <div class="card list">
+      <button class="row" id="export-data"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 21h16"/></svg></span>Экспорт данных</button>
+      <button class="row" id="import-data"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M4 21h16"/></svg></span>Импорт данных</button>
+      <input type="file" id="import-file" accept="application/json,.json" hidden>
     </div>
     <div class="card list">
       <button class="row danger" id="clear-data"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></span>Очистить данные</button>
@@ -159,7 +172,9 @@
         <label>Куда<select id="tx-to"></select></label>
       </div>
       <label>Комментарий<input type="text" id="tx-note" maxlength="60" placeholder="необязательно"></label>
+      <div class="chips" id="tx-chips"></div>
       <label>Дата<input type="date" id="tx-date" required></label>
+      <button type="button" class="btn ghost block" id="tx-repeat" hidden>Повторить последнюю</button>
       <div class="actions"><button type="button" class="btn ghost cancel">Отмена</button><button type="submit" class="btn primary">Сохранить</button></div>
     </form>
 
@@ -226,6 +241,6 @@
   </div>
 </div>
 
-<script src="app.js?v=10"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>
