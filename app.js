@@ -1,370 +1,289 @@
 /* =====================================================
-   Мои Финансы — логика приложения
-   Данные хранятся в localStorage (прямо в браузере)
+   Мои Финансы — логика. Все данные — в localStorage.
    ===================================================== */
 
-// ---------- Категории ----------
-const CATEGORIES = {
-  expense: [
-    { name: 'Продукты',    icon: '🍔' },
-    { name: 'Транспорт',   icon: '🚌' },
-    { name: 'Жильё',       icon: '🏠' },
-    { name: 'Развлечения', icon: '🎬' },
-    { name: 'Здоровье',    icon: '💊' },
-    { name: 'Другое',      icon: '📦' },
-  ],
-  income: [
-    { name: 'Зарплата',    icon: '💼' },
-    { name: 'Фриланс',     icon: '💻' },
-    { name: 'Подарки',     icon: '🎁' },
-    { name: 'Другое',      icon: '✨' },
-  ],
+const $ = (id) => document.getElementById(id);
+const fmt = new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 });
+const esc = (s) => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML.replace(/"/g, '&quot;'); };
+const load = (k, f) => { try { return JSON.parse(localStorage.getItem(k)) ?? f; } catch { return f; } };
+const save = () => {
+  localStorage.setItem('fin_transactions', JSON.stringify(txs));
+  localStorage.setItem('fin_investments', JSON.stringify(invs));
+  localStorage.setItem('fin_categories', JSON.stringify(cats));
+  localStorage.setItem('fin_autopays', JSON.stringify(pays));
 };
 
-// ---------- Хранилище ----------
-function load(key, fallback) {
-  try {
-    return JSON.parse(localStorage.getItem(key)) ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-let transactions = load('fin_transactions', []); // {id, type, amount, category, note, date}
-let investments  = load('fin_investments', []);  // {id, name, invested, current}
-
-function save() {
-  localStorage.setItem('fin_transactions', JSON.stringify(transactions));
-  localStorage.setItem('fin_investments', JSON.stringify(investments));
-}
+let txs = load('fin_transactions', []);   // доходы/расходы
+let invs = load('fin_investments', []);   // инвестиции
+let pays = load('fin_autopays', []);      // автоплатежи
+let cats = load('fin_categories') || {    // категории
+  expense: [
+    { icon: '🍔', name: 'Продукты' }, { icon: '🚌', name: 'Транспорт' },
+    { icon: '🏠', name: 'Жильё' }, { icon: '🎬', name: 'Развлечения' },
+    { icon: '💊', name: 'Здоровье' }, { icon: '🔄', name: 'Автоплатёж' },
+    { icon: '📦', name: 'Другое' },
+  ],
+  income: [
+    { icon: '💼', name: 'Зарплата' }, { icon: '💻', name: 'Фриланс' },
+    { icon: '🎁', name: 'Подарки' }, { icon: '✨', name: 'Другое' },
+  ],
+};
+if (!localStorage.getItem('fin_categories')) save();
 
 // ---------- Утилиты ----------
-const fmt = new Intl.NumberFormat('ru-RU', {
-  style: 'currency', currency: 'RUB', maximumFractionDigits: 0,
-});
-
 const fmtSign = (n) => (n >= 0 ? '+' : '−') + fmt.format(Math.abs(n));
-
-const byId = (id) => document.getElementById(id);
-
-function todayISO() {
-  const d = new Date();
-  return d.toISOString().slice(0, 10); // формат ГГГГ-ММ-ДД
-}
+const todayISO = () => new Date().toISOString().slice(0, 10);
+const month = () => todayISO().slice(0, 7);
+const icon = (type, name) => (cats[type].find((c) => c.name === name) || {}).icon || '🏷️';
 
 function formatDate(iso) {
-  const [y, m, d] = iso.split('-').map(Number);
-  const months = ['января','февраля','марта','апреля','мая','июня',
-                  'июля','августа','сентября','октября','ноября','декабря'];
-  const now = new Date();
-  const label = `${d} ${months[m - 1]}` + (y !== now.getFullYear() ? ` ${y}` : '');
   if (iso === todayISO()) return 'Сегодня';
-  return label;
+  const [y, m, d] = iso.split('-').map(Number);
+  const M = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+  return `${d} ${M[m - 1]}` + (y !== new Date().getFullYear() ? ` ${y}` : '');
 }
 
-function currentMonth() {
-  return todayISO().slice(0, 7); // формат ГГГГ-ММ
+// ---------- Навигация ----------
+function showView(name) {
+  document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.id === 'view-' + name));
+  document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active',
+    t.dataset.view === name || (t.dataset.view === 'more' && ['categories', 'autopays'].includes(name))));
+  $('fab').hidden = name === 'more';
+}
+document.querySelectorAll('.tab').forEach((t) => (t.onclick = () => showView(t.dataset.view)));
+document.querySelectorAll('[data-go]').forEach((b) => (b.onclick = () => showView(b.dataset.go)));
+
+// ---------- Тема и очистка данных ----------
+const themeBox = $('theme-toggle');
+themeBox.checked = document.documentElement.dataset.theme === 'dark';
+themeBox.onchange = () => {
+  const t = themeBox.checked ? 'dark' : 'light';
+  document.documentElement.dataset.theme = t;
+  localStorage.setItem('fin_theme', t);
+  document.querySelector('meta[name=theme-color]').content = t === 'light' ? '#f2f2f7' : '#000000';
+};
+
+$('clear-data').onclick = () => {
+  if (confirm('Удалить ВСЕ данные? Действие необратимо.')) { localStorage.clear(); location.reload(); }
+};
+
+// ---------- Автоплатежи: списание при запуске ----------
+function runPays() {
+  const m = month(), d = new Date().getDate();
+  let changed = false;
+  for (const p of pays) {
+    if (p.lastRun !== m && d >= p.day) {
+      txs.push({ id: Date.now() + Math.random(), type: 'expense', amount: p.amount, category: 'Автоплатёж', note: p.name, date: todayISO() });
+      p.lastRun = m;
+      changed = true;
+    }
+  }
+  if (changed) save();
 }
 
-function categoryIcon(type, name) {
-  const list = CATEGORIES[type] || [];
-  return (list.find((c) => c.name === name) || { icon: '❓' }).icon;
+// ---------- Модальное окно ----------
+const modal = $('modal');
+let editing = null; // id редактируемой инвестиции
+
+function openModal(kind) {
+  ['tx', 'inv', 'cat', 'pay'].forEach((k) => ($(`${k}-form`).hidden = k !== kind));
+  modal.classList.add('open');
+  if (kind === 'tx') { $('tx-date').value = todayISO(); fillCat(); }
+  if (kind === 'cat') { setSeg($('cat-form'), 'expense'); pickEmoji('🍔'); }
+}
+function closeModal() {
+  modal.classList.remove('open');
+  document.querySelectorAll('.sheet form').forEach((f) => f.reset());
+  editing = null;
+}
+$('fab').onclick = () => {
+  const v = document.querySelector('.view.active').id.slice(5);
+  openModal({ overview: 'tx', history: 'tx', investments: 'inv', categories: 'cat', autopays: 'pay' }[v]);
+};
+modal.onclick = (e) => { if (e.target === modal) closeModal(); };
+document.querySelectorAll('.cancel').forEach((b) => (b.onclick = closeModal));
+
+// Сегментированные переключатели Расход/Доход
+function setSeg(form, type) {
+  form.dataset.type = type;
+  form.querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('on', b.dataset.type === type));
+}
+document.querySelectorAll('.seg').forEach((seg) => (seg.onclick = (e) => {
+  const b = e.target.closest('.seg-btn');
+  if (!b) return;
+  setSeg(seg.closest('form'), b.dataset.type);
+  if (seg.closest('form').id === 'tx-form') fillCat();
+}));
+
+function fillCat() {
+  $('tx-category').innerHTML = cats[$('tx-form').dataset.type]
+    .map((c) => `<option value="${esc(c.name)}">${c.icon} ${esc(c.name)}</option>`).join('');
 }
 
-// ---------- Переключение экранов ----------
-document.querySelectorAll('.nav-btn').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.nav-btn').forEach((b) => b.classList.remove('active'));
-    document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
-    btn.classList.add('active');
-    byId('view-' + btn.dataset.view).classList.add('active');
+// Выбор иконки категории
+const EMOJIS = ['🍔','🛒','🚌','🏠','🎬','💊','👕','✈️','🎓','🐾','💼','💻','🎁','✨','📦','💳'];
+$('emoji-row').innerHTML = EMOJIS.map((e) => `<button type="button">${e}</button>`).join('');
+function pickEmoji(e) {
+  $('cat-form').dataset.icon = e;
+  $('emoji-row').querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.textContent === e));
+}
+$('emoji-row').onclick = (e) => { if (e.target.tagName === 'BUTTON') pickEmoji(e.target.textContent); };
+
+// ---------- Сохранение форм ----------
+$('tx-form').onsubmit = (e) => {
+  e.preventDefault();
+  txs.push({
+    id: Date.now(), type: $('tx-form').dataset.type, amount: +$('tx-amount').value,
+    category: $('tx-category').value, note: $('tx-note').value.trim(), date: $('tx-date').value || todayISO(),
   });
-});
+  save(); renderAll(); closeModal();
+};
+
+$('inv-form').onsubmit = (e) => {
+  e.preventDefault();
+  const d = { name: $('inv-name').value.trim(), invested: +$('inv-invested').value, current: +$('inv-current').value };
+  editing ? Object.assign(invs.find((i) => i.id === editing), d) : invs.push({ id: Date.now(), ...d });
+  save(); renderAll(); closeModal();
+};
+
+$('cat-form').onsubmit = (e) => {
+  e.preventDefault();
+  cats[$('cat-form').dataset.type].push({ icon: $('cat-form').dataset.icon, name: $('cat-name').value.trim() });
+  save(); renderAll(); closeModal();
+};
+
+$('pay-form').onsubmit = (e) => {
+  e.preventDefault();
+  pays.push({ id: Date.now(), name: $('pay-name').value.trim(), amount: +$('pay-amount').value, day: +$('pay-day').value, lastRun: null });
+  save(); runPays(); renderAll(); closeModal();
+};
 
 // ---------- Рендер: ОБЗОР ----------
 function renderOverview() {
-  // Общий баланс
-  const balance = transactions.reduce(
-    (sum, t) => sum + (t.type === 'income' ? t.amount : -t.amount), 0
-  );
-  byId('total-balance').textContent = fmt.format(balance);
+  $('total-balance').textContent = fmt.format(txs.reduce((s, t) => s + (t.type === 'income' ? t.amount : -t.amount), 0));
 
-  // Доходы и расходы за текущий месяц
-  const month = currentMonth();
-  let monthIncome = 0;
-  let monthExpense = 0;
-  const byCategory = {};
-
-  for (const t of transactions) {
-    if (!t.date.startsWith(month)) continue;
-    if (t.type === 'income') {
-      monthIncome += t.amount;
-    } else {
-      monthExpense += t.amount;
-      byCategory[t.category] = (byCategory[t.category] || 0) + t.amount;
-    }
+  const m = month();
+  let mi = 0, me = 0;
+  const by = {};
+  for (const t of txs) {
+    if (!t.date.startsWith(m)) continue;
+    if (t.type === 'income') mi += t.amount;
+    else { me += t.amount; by[t.category] = (by[t.category] || 0) + t.amount; }
   }
+  $('month-income').textContent = fmt.format(mi);
+  $('month-expense').textContent = fmt.format(me);
 
-  byId('month-income').textContent = fmt.format(monthIncome);
-  byId('month-expense').textContent = fmt.format(monthExpense);
+  const en = Object.entries(by).sort((a, b) => b[1] - a[1]);
+  $('category-bars').innerHTML = en.length ? en.map(([n, s]) => `
+    <div class="bar">
+      <div class="bar-top"><span>${icon('expense', n)} ${esc(n)}</span><b>${fmt.format(s)}</b></div>
+      <div class="track"><i style="width:${Math.round((s / en[0][1]) * 100)}%"></i></div>
+    </div>`).join('') : '<div class="empty">Нет расходов в этом месяце</div>';
 
-  // Полоски по категориям
-  const barsBox = byId('category-bars');
-  const entries = Object.entries(byCategory).sort((a, b) => b[1] - a[1]);
-
-  if (entries.length === 0) {
-    barsBox.innerHTML = '<div class="empty">Пока нет расходов в этом месяце</div>';
-  } else {
-    const max = entries[0][1];
-    barsBox.innerHTML = entries.map(([name, sum]) => `
-      <div class="bar-row">
-        <div class="bar-top">
-          <span>${categoryIcon('expense', name)} ${name}</span>
-          <span>${fmt.format(sum)}</span>
-        </div>
-        <div class="bar-track">
-          <div class="bar-fill" style="width:${Math.round((sum / max) * 100)}%"></div>
-        </div>
-      </div>
-    `).join('');
-  }
-
-  // Сводка по инвестициям
-  const invested = investments.reduce((s, i) => s + i.invested, 0);
-  const current  = investments.reduce((s, i) => s + i.current, 0);
-  const summaryBox = byId('invest-summary');
-
-  if (investments.length === 0) {
-    summaryBox.innerHTML = '<div class="empty">Пока нет инвестиций</div>';
-  } else {
-    const profit = current - invested;
-    const percent = invested > 0 ? ((profit / invested) * 100).toFixed(1) : 0;
-    const cls = profit >= 0 ? 'profit-pos' : 'profit-neg';
-    summaryBox.innerHTML = `
-      <div class="invest-rows">
-        <div class="cell"><div class="lbl">Вложено</div><div class="val">${fmt.format(invested)}</div></div>
-        <div class="cell"><div class="lbl">Сейчас</div><div class="val">${fmt.format(current)}</div></div>
-        <div class="cell"><div class="lbl">Прибыль</div><div class="val ${cls}">${fmtSign(profit)} (${percent}%)</div></div>
-      </div>
-    `;
-  }
+  const si = invs.reduce((s, i) => s + i.invested, 0);
+  const sc = invs.reduce((s, i) => s + i.current, 0);
+  const pr = sc - si;
+  $('invest-summary').innerHTML = invs.length ? `
+    <div class="cols">
+      <div><small>Вложено</small><b>${fmt.format(si)}</b></div>
+      <div><small>Сейчас</small><b>${fmt.format(sc)}</b></div>
+      <div><small>Прибыль</small><b class="${pr >= 0 ? 'in' : 'out'}">${fmtSign(pr)} (${si ? ((pr / si) * 100).toFixed(1) : 0}%)</b></div>
+    </div>` : '<div class="empty">Нет инвестиций</div>';
 }
 
 // ---------- Рендер: ИСТОРИЯ ----------
 function renderHistory() {
-  const box = byId('history-list');
+  const box = $('history-list');
+  if (!txs.length) { box.innerHTML = '<div class="empty">Операций нет. Нажми «+», чтобы добавить первую</div>'; return; }
 
-  if (transactions.length === 0) {
-    box.innerHTML = '<div class="empty">Операций пока нет. Нажми «+», чтобы добавить первую</div>';
-    return;
-  }
-
-  // Сортировка: сначала новые
-  const sorted = [...transactions].sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
-
-  // Группировка по датам
-  let html = '';
-  let lastDate = null;
-
+  const sorted = [...txs].sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
+  let html = '', last = null;
   for (const t of sorted) {
-    if (t.date !== lastDate) {
-      if (lastDate !== null) html += '</div>';
-      html += `<div class="day-group"><div class="day-title">${formatDate(t.date)}</div>`;
-      lastDate = t.date;
+    if (t.date !== last) {
+      if (last) html += '</div>';
+      html += `<div class="card list"><div class="sec">${formatDate(t.date)}</div>`;
+      last = t.date;
     }
-    const plus = t.type === 'income';
+    const inc = t.type === 'income';
     html += `
-      <div class="tx-item">
-        <div class="tx-icon">${categoryIcon(t.type, t.category)}</div>
-        <div class="tx-info">
-          <div class="tx-category">${t.category}</div>
-          ${t.note ? `<div class="tx-note">${escapeHtml(t.note)}</div>` : ''}
-        </div>
-        <div class="tx-amount ${plus ? 'plus' : 'minus'}">${plus ? '+' : '−'}${fmt.format(t.amount)}</div>
-        <button class="tx-delete" data-id="${t.id}" aria-label="Удалить">✕</button>
-      </div>
-    `;
+      <div class="li">
+        <div class="ic">${icon(t.type, t.category)}</div>
+        <div class="grow"><div class="name">${esc(t.category)}</div>${t.note ? `<div class="note">${esc(t.note)}</div>` : ''}</div>
+        <div class="amt ${inc ? 'in' : 'out'}">${inc ? '+' : '−'}${fmt.format(t.amount)}</div>
+        <button class="del" data-id="${t.id}">✕</button>
+      </div>`;
   }
-  html += '</div>';
-  box.innerHTML = html;
+  box.innerHTML = html + '</div>';
 
-  // Удаление
-  box.querySelectorAll('.tx-delete').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      if (!confirm('Удалить эту операцию?')) return;
-      transactions = transactions.filter((t) => t.id !== Number(btn.dataset.id));
-      save();
-      renderAll();
-    });
-  });
+  box.querySelectorAll('.del').forEach((b) => (b.onclick = () => {
+    if (confirm('Удалить операцию?')) { txs = txs.filter((t) => t.id != b.dataset.id); save(); renderAll(); }
+  }));
 }
 
 // ---------- Рендер: ИНВЕСТИЦИИ ----------
 function renderInvestments() {
-  const box = byId('invest-list');
+  const box = $('invest-list');
+  if (!invs.length) { box.innerHTML = '<div class="empty">Инвестиций нет. Нажми «+», чтобы добавить</div>'; return; }
 
-  if (investments.length === 0) {
-    box.innerHTML = '<div class="empty">Инвестиций пока нет. Нажми «+», чтобы добавить</div>';
-    return;
-  }
-
-  box.innerHTML = investments.map((i) => {
-    const profit = i.current - i.invested;
-    const percent = i.invested > 0 ? ((profit / i.invested) * 100).toFixed(1) : 0;
-    const cls = profit >= 0 ? 'profit-pos' : 'profit-neg';
+  box.innerHTML = invs.map((i) => {
+    const pr = i.current - i.invested, pct = i.invested ? ((pr / i.invested) * 100).toFixed(1) : 0;
     return `
-      <div class="invest-item">
-        <div class="invest-top">
-          <div class="invest-name">${escapeHtml(i.name)}</div>
-          <div class="invest-actions">
-            <button data-action="edit" data-id="${i.id}">✏️</button>
-            <button data-action="delete" data-id="${i.id}">🗑️</button>
-          </div>
+      <div class="card">
+        <div class="bar-top" style="margin-bottom:10px"><b style="font-size:16px">${esc(i.name)}</b><span>
+          <button class="del" data-a="edit" data-id="${i.id}">✏️</button><button class="del" data-a="del" data-id="${i.id}">🗑️</button></span></div>
+        <div class="cols">
+          <div><small>Вложено</small><b>${fmt.format(i.invested)}</b></div>
+          <div><small>Сейчас</small><b>${fmt.format(i.current)}</b></div>
+          <div><small>Прибыль</small><b class="${pr >= 0 ? 'in' : 'out'}">${fmtSign(pr)} (${pct}%)</b></div>
         </div>
-        <div class="invest-rows">
-          <div class="cell"><div class="lbl">Вложено</div><div class="val">${fmt.format(i.invested)}</div></div>
-          <div class="cell"><div class="lbl">Сейчас</div><div class="val">${fmt.format(i.current)}</div></div>
-          <div class="cell"><div class="lbl">Прибыль</div><div class="val ${cls}">${fmtSign(profit)} (${percent}%)</div></div>
-        </div>
-      </div>
-    `;
+      </div>`;
   }).join('');
 
-  // Кнопки редактирования и удаления
-  box.querySelectorAll('button[data-action]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const id = Number(btn.dataset.id);
-      const inv = investments.find((i) => i.id === id);
-
-      if (btn.dataset.action === 'delete') {
-        if (confirm(`Удалить «${inv.name}»?`)) {
-          investments = investments.filter((i) => i.id !== id);
-          save();
-          renderAll();
-        }
-      } else {
-        openModal('invest');
-        byId('inv-name').value = inv.name;
-        byId('inv-invested').value = inv.invested;
-        byId('inv-current').value = inv.current;
-        editingInvestmentId = id;
-      }
-    });
-  });
+  box.querySelectorAll('.del').forEach((b) => (b.onclick = () => {
+    const i = invs.find((x) => x.id === +b.dataset.id);
+    if (b.dataset.a === 'del') {
+      if (confirm(`Удалить «${i.name}»?`)) { invs = invs.filter((x) => x.id !== i.id); save(); renderAll(); }
+    } else {
+      editing = i.id;
+      openModal('inv');
+      $('inv-name').value = i.name; $('inv-invested').value = i.invested; $('inv-current').value = i.current;
+    }
+  }));
 }
 
-function renderAll() {
-  renderOverview();
-  renderHistory();
-  renderInvestments();
+// ---------- Рендер: КАТЕГОРИИ и АВТОПЛАТЕЖИ ----------
+function renderCats() {
+  const row = (c, t) => `
+    <div class="li">
+      <div class="ic">${c.icon}</div><div class="grow name">${esc(c.name)}</div>
+      <button class="del" data-t="${t}" data-n="${esc(c.name)}">✕</button>
+    </div>`;
+  $('cat-list').innerHTML =
+    '<div class="sec">Расходы</div>' + cats.expense.map((c) => row(c, 'expense')).join('') +
+    '<div class="sec">Доходы</div>' + cats.income.map((c) => row(c, 'income')).join('') ||
+    '<div class="empty">Нет категорий</div>';
+  $('cat-list').querySelectorAll('.del').forEach((b) => (b.onclick = () => {
+    cats[b.dataset.t] = cats[b.dataset.t].filter((c) => c.name !== b.dataset.n);
+    save(); renderAll();
+  }));
 }
 
-// Защита от вставки HTML через комментарий/название
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
+function renderPays() {
+  $('autopay-list').innerHTML = pays.length ? pays.map((p) => `
+    <div class="li">
+      <div class="ic">🔄</div>
+      <div class="grow"><div class="name">${esc(p.name)}</div><div class="note">${p.day}-го числа · ${fmt.format(p.amount)}</div></div>
+      <button class="del" data-id="${p.id}">✕</button>
+    </div>`).join('') : '<div class="empty">Автоплатежей нет. Нажми «Добавить», чтобы настроить</div>';
+  $('autopay-list').querySelectorAll('.del').forEach((b) => (b.onclick = () => {
+    if (confirm('Удалить автоплатёж?')) { pays = pays.filter((p) => p.id != b.dataset.id); save(); renderAll(); }
+  }));
 }
-
-// ---------- МОДАЛЬНОЕ ОКНО ----------
-const modal = byId('modal');
-let currentFormType = 'tx';   // 'tx' (доход/расход) или 'invest'
-let editingInvestmentId = null;
-let txType = 'expense';       // текущий тип операции
-
-function openModal(type) {
-  currentFormType = type;
-  byId('tx-form').hidden = type !== 'tx';
-  byId('inv-form').hidden = type !== 'invest';
-  modal.classList.add('open');
-
-  if (type === 'tx') {
-    byId('tx-date').value = todayISO();
-    updateCategorySelect();
-    setTimeout(() => byId('tx-amount').focus(), 100);
-  } else {
-    editingInvestmentId = null;
-    byId('inv-form').reset();
-  }
-}
-
-function closeModal() {
-  modal.classList.remove('open');
-  byId('tx-form').reset();
-  byId('inv-form').reset();
-  editingInvestmentId = null;
-}
-
-// Кнопка «+» — зависит от открытого экрана
-byId('fab').addEventListener('click', () => {
-  const activeView = document.querySelector('.view.active').id;
-  openModal(activeView === 'view-investments' ? 'invest' : 'tx');
-});
-
-byId('tx-cancel').addEventListener('click', closeModal);
-byId('inv-cancel').addEventListener('click', closeModal);
-modal.addEventListener('click', (e) => {
-  if (e.target === modal) closeModal();
-});
-
-// ---------- Переключатель Расход / Доход ----------
-document.querySelectorAll('.type-btn').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    txType = btn.dataset.type;
-    document.querySelectorAll('.type-btn').forEach((b) => {
-      b.classList.remove('active');
-      b.classList.toggle('income-active', b.dataset.type === 'income');
-    });
-    btn.classList.add('active');
-    updateCategorySelect();
-  });
-});
-
-function updateCategorySelect() {
-  byId('tx-category').innerHTML = CATEGORIES[txType]
-    .map((c) => `<option value="${c.name}">${c.icon} ${c.name}</option>`)
-    .join('');
-}
-
-// ---------- Сохранение дохода/расхода ----------
-byId('tx-form').addEventListener('submit', (e) => {
-  e.preventDefault();
-
-  transactions.push({
-    id: Date.now(),
-    type: txType,
-    amount: Math.round(parseFloat(byId('tx-amount').value) * 100) / 100,
-    category: byId('tx-category').value,
-    note: byId('tx-note').value.trim(),
-    date: byId('tx-date').value || todayISO(),
-  });
-
-  save();
-  renderAll();
-  closeModal();
-});
-
-// ---------- Сохранение инвестиции ----------
-byId('inv-form').addEventListener('submit', (e) => {
-  e.preventDefault();
-
-  const data = {
-    name: byId('inv-name').value.trim(),
-    invested: parseFloat(byId('inv-invested').value),
-    current: parseFloat(byId('inv-current').value),
-  };
-
-  if (editingInvestmentId) {
-    const inv = investments.find((i) => i.id === editingInvestmentId);
-    Object.assign(inv, data);
-  } else {
-    investments.push({ id: Date.now(), ...data });
-  }
-
-  save();
-  renderAll();
-  closeModal();
-});
 
 // ---------- Запуск ----------
+$('add-cat').onclick = () => openModal('cat');
+$('add-pay').onclick = () => openModal('pay');
+function renderAll() { renderOverview(); renderHistory(); renderInvestments(); renderCats(); renderPays(); }
+runPays();
 renderAll();
+showView('overview');
