@@ -593,8 +593,9 @@ function accountBalance(a) {
     : t.account === a.id ? s + (t.type === 'income' ? t.amount : -t.amount) : s, 0);
 }
 function renderOverview() {
-  const totals = accounts.reduce((o,a) => (o[a.currency]=(o[a.currency]||0)+accountBalance(a),o),{});
-  $('total-balance').innerHTML = Object.entries(totals).map(([c,v])=>`<span class="balance-total">${money(v,c)}</span>`).join(' · ') || money(0);
+  const rubAccounts = accounts.filter(a => (a.currency || 'RUB') === 'RUB');
+  $('total-balance').textContent = money(rubAccounts.reduce((s,a)=>s+accountBalance(a),0),'RUB');
+  $('balance-note').hidden = !accounts.some(a => (a.currency || 'RUB') !== 'RUB');
   $('account-list').classList.toggle('ordering', orderingAccounts);
   $('order-mode').textContent = orderingAccounts ? 'Готово' : 'Изменить порядок';
   $('account-list').innerHTML = accounts.map((a) => {

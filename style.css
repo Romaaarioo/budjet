@@ -364,7 +364,7 @@ body::before, body::after { display: none !important; animation: none !important
 .drag-handle { display:none; color:var(--muted); font-size:22px; padding:4px 8px; cursor:grab; touch-action:none; }
 #account-list.ordering .drag-handle { display:block; }
 #account-list.ordering .dragging { opacity:.5; }
-.balance-total { display:inline-block; margin-right:12px; }
+.balance-note { margin-top:6px; color:var(--muted); font-size:12px; }
 .row .switch { margin-left:auto; }
 #account-list.ordering .li { pointer-events:none; }
 #account-list.ordering .drag-handle { pointer-events:auto; }
