@@ -4,6 +4,8 @@
 
 const $ = (id) => document.getElementById(id);
 const fmt = new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 });
+const money = (n, currency = 'RUB') => new Intl.NumberFormat('ru-RU', { style: 'currency', currency, maximumFractionDigits: currency === 'RUB' ? 0 : 2 }).format(n);
+const txCurrency = (t) => t.currency || (accounts.find(a=>a.id===(t.account||t.from))||{}).currency || 'RUB';
 const esc = (s) => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML.replace(/"/g, '&quot;'); };
 const load = (k, f) => { try { return JSON.parse(localStorage.getItem(k)) ?? f; } catch { return f; } };
 const save = () => {
@@ -86,6 +88,7 @@ const ICON_EMOJI = { food:'🍽️',cart:'🛒',bus:'🚌',home:'🏠',play:'�
 const E2K = { '🍔':'food','🛒':'cart','🚌':'bus','🏠':'home','🎬':'play','💊':'heart','👕':'shirt','✈️':'plane','🎓':'cap','🐾':'paw','💼':'case','💻':'laptop','🎁':'gift','✨':'sparkle','📦':'box','💳':'card','🔄':'refresh','💵':'cash','🏦':'bank','🪙':'coins','📈':'trend','💎':'gem' };
 let migrated = false;
 [...cats.expense, ...cats.income, ...accounts].forEach((c) => { if (E2K[c.icon]) { c.icon = E2K[c.icon]; migrated = true; } });
+accounts.forEach((a) => { if (!a.currency) { a.currency = 'RUB'; migrated = true; } });
 Object.entries(DEFAULT_CATS).forEach(([type, list]) => list.forEach(([name, icon]) => {
   if (!cats[type].some((c) => c.name === name)) { cats[type].push({ name, icon }); migrated = true; }
 }));
@@ -231,7 +234,8 @@ function runPays() {
   let changed = false;
   for (const p of pays) {
     if (p.lastRun !== m && d >= p.day) {
-      txs.push({ id: Date.now() + Math.random(), type: 'expense', amount: p.amount, category: 'Автоплатёж', note: p.name, date: todayISO(), account: p.account || (accounts[0] && accounts[0].id) });
+      const a = accounts.find(x=>x.id===+(p.account||accounts[0]?.id));
+      txs.push({ id: Date.now() + Math.random(), type: 'expense', amount: p.amount, category: 'Автоплатёж', note: p.name, date: todayISO(), account: a && a.id, currency: a && a.currency || 'RUB' });
       p.lastRun = m;
       changed = true;
     }
@@ -267,12 +271,19 @@ function openModal(kind) {
     setSeg($('cat-form'), 'expense'); pickEmoji($('cat-form'), 'sparkle'); $('cat-emoji').value = '';
   }
   if (kind === 'goal' && !editingGoal) $('goal-form').querySelector('.h2').textContent = 'Цель накоплений';
-  if (kind === 'acc') { pickEmoji($('acc-form'), 'cash'); $('acc-emoji').value = ''; }
+  if (kind === 'acc') {
+    $('acc-start-wrap').hidden = !!editingAcc;
+    $('acc-current-wrap').hidden = !editingAcc;
+    $('acc-currency').disabled = false;
+    if (!editingAcc) $('acc-currency').value = 'RUB';
+    pickEmoji($('acc-form'), 'cash'); $('acc-emoji').value = '';
+  }
   if (kind === 'cb') { $('cb-date').value = todayISO(); fillCbCards(); }
   if (kind === 'card') fillCbCards();
   if (kind === 'pay') {
-    $('pay-account').innerHTML = accounts.map((a) => `<option value="${a.id}">${esc(a.name)}</option>`).join('');
+    $('pay-account').innerHTML = accounts.map((a) => `<option value="${a.id}">${esc(a.name)} · ${a.currency||'RUB'}</option>`).join('');
     if (!editingPay) $('pay-account').value = accounts[0] ? accounts[0].id : '';
+    $('pay-account').onchange();
   }
   if (kind === 'budget') {
     $('budget-title').textContent = 'Лимит: ' + editingBudget;
@@ -339,7 +350,7 @@ function fillCat() {
     .map((c) => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('');
 }
 function fillAcc() {
-  const opts = accounts.map((a) => `<option value="${a.id}">${esc(a.name)}</option>`).join('');
+  const opts = accounts.map((a) => `<option value="${a.id}">${esc(a.name)} · ${a.currency||'RUB'}</option>`).join('');
   $('tx-account').innerHTML = opts;
   $('tx-from').innerHTML = opts;
   $('tx-to').innerHTML = opts;
@@ -365,10 +376,14 @@ function syncTxForm() {
   $('tx-cat-wrap').hidden = tr;
   $('tx-acc-wrap').hidden = tr;
   $('tx-transfer-wrap').hidden = !tr;
+  const acc = accounts.find(a=>a.id===+(tr ? $('tx-from').value : $('tx-account').value));
+  $('tx-amount-label').firstChild.textContent = `Сумма · ${acc?.currency||'RUB'}`;
   if (tr && accounts.length > 1 && $('tx-from').value === $('tx-to').value) {
     $('tx-to').value = accounts.find((a) => a.id !== +$('tx-from').value).id;
   }
 }
+$('tx-account').onchange = syncTxForm;
+$('tx-from').onchange = syncTxForm;
 function fillCbCards() {
   $('cb-card').innerHTML = cards.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
   $('cb-card-cat').innerHTML = cats.expense.map((c) => `<option value="${esc(c.name)}">${esc(ICON_EMOJI[c.icon] || (ICONS[c.icon] ? '🏷️' : c.icon))} ${esc(c.name)}</option>`).join('');
@@ -404,11 +419,13 @@ $('tx-form').onsubmit = (e) => {
   if (type === 'transfer') {
     const from = +$('tx-from').value, to = +$('tx-to').value;
     if (from === to) { alert('Выбери разные счета'); return; }
+    if (accounts.find(a=>a.id===from)?.currency !== accounts.find(a=>a.id===to)?.currency) { alert('Переводы между разными валютами пока недоступны без курса'); return; }
     d = { type, amount: +$('tx-amount').value, from, to, note: $('tx-note').value.trim(), date: $('tx-date').value || todayISO() };
   } else {
     d = {
       type, amount: +$('tx-amount').value,
       category: $('tx-category').value, account: +$('tx-account').value,
+      currency: accounts.find(a=>a.id===+$('tx-account').value)?.currency || 'RUB',
       note: $('tx-note').value.trim(), date: $('tx-date').value || todayISO(),
     };
   }
@@ -444,9 +461,13 @@ $('cat-form').onsubmit = (e) => {
 
 $('acc-form').onsubmit = (e) => {
   e.preventDefault();
-  const d = { name: $('acc-name').value.trim(), start: +$('acc-start').value || 0, icon: $('acc-form').dataset.icon };
-  if (editingAcc) Object.assign(accounts.find((a) => a.id === editingAcc), d);
-  else accounts.push({ id: Date.now(), ...d });
+  const d = { name: $('acc-name').value.trim(), icon: $('acc-form').dataset.icon };
+  if (editingAcc) {
+    const a = accounts.find((x) => x.id === editingAcc);
+    const flow = txs.reduce((s,t) => t.type === 'transfer' ? s + (t.to === a.id ? (t.toAmount ?? t.amount) : t.from === a.id ? -t.amount : 0) : t.account === a.id ? s + (t.type === 'income' ? t.amount : -t.amount) : s, 0);
+    a.start = +$('acc-current').value - flow;
+    Object.assign(a, d);
+  } else accounts.push({ id: Date.now(), ...d, start: +$('acc-start').value || 0, currency: $('acc-currency').value });
   save(); renderAll(); closeModal();
 };
 
@@ -488,6 +509,7 @@ $('pay-form').onsubmit = (e) => {
   else pays.push({id:Date.now(),...d});
   save(); renderAll(); closeModal();
 };
+$('pay-account').onchange = () => { $('pay-amount').parentElement.firstChild.textContent = `Сумма · ${(accounts.find(a=>a.id===+$('pay-account').value)||{}).currency||'RUB'}`; };
 
 // ---------- Редактирование ----------
 function editTx(id) {
@@ -515,7 +537,11 @@ function editAcc(id) {
   editingAcc = a.id;
   openModal('acc');
   $('acc-name').value = a.name;
-  $('acc-start').value = a.start;
+  $('acc-start-wrap').hidden = true;
+  $('acc-current-wrap').hidden = false;
+  $('acc-current').value = accountBalance(a);
+  $('acc-currency').value = a.currency || 'RUB';
+  $('acc-currency').disabled = txs.some((t) => t.account === a.id || (t.type === 'transfer' && (t.from === a.id || t.to === a.id)));
   pickEmoji($('acc-form'), a.icon);
 }
 
@@ -560,45 +586,66 @@ function editCat(type, name) {
 }
 
 // ---------- Рендер: СЧЕТА ----------
+let orderingAccounts = false;
+function accountBalance(a) {
+  return a.start + txs.reduce((s, t) => t.type === 'transfer'
+    ? s + (t.to === a.id ? (t.toAmount ?? t.amount) : t.from === a.id ? -t.amount : 0)
+    : t.account === a.id ? s + (t.type === 'income' ? t.amount : -t.amount) : s, 0);
+}
 function renderOverview() {
-  $('total-balance').textContent = fmt.format(
-    accounts.reduce((s, a) => s + a.start, 0) +
-    txs.reduce((s, t) => t.type === 'transfer' ? s : s + (t.type === 'income' ? t.amount : -t.amount), 0)
-  );
-
-  const bal = (a) => a.start + txs.reduce((s, t) =>
-    t.type === 'transfer'
-      ? s + (t.to === a.id ? t.amount : t.from === a.id ? -t.amount : 0)
-      : t.account === a.id ? s + (t.type === 'income' ? t.amount : -t.amount) : s, 0);
+  const totals = accounts.reduce((o,a) => (o[a.currency]=(o[a.currency]||0)+accountBalance(a),o),{});
+  $('total-balance').innerHTML = Object.entries(totals).map(([c,v])=>`<span class="balance-total">${money(v,c)}</span>`).join(' · ') || money(0);
+  $('account-list').classList.toggle('ordering', orderingAccounts);
+  $('order-mode').textContent = orderingAccounts ? 'Готово' : 'Изменить порядок';
   $('account-list').innerHTML = accounts.map((a) => {
-    const b = bal(a);
+    const b = accountBalance(a);
     return `
-      <div class="swipe">
+      <div class="swipe" data-account="${a.id}" draggable="${orderingAccounts}">
         <div class="swipe-actions"></div>
         <div class="li tap" data-id="${a.id}">
           <div class="ic">${renderIcon(a.icon)}</div>
-          <div class="grow"><div class="name">${esc(a.name)}</div><div class="note">Баланс счёта</div></div>
-          <div class="amt ${b >= 0 ? 'in' : 'out'}">${fmt.format(b)}</div>
-          <span class="order-controls"><button type="button" data-move="-1" aria-label="Переместить ${esc(a.name)} выше" ${accounts.indexOf(a) === 0 ? 'disabled' : ''}>↑</button><button type="button" data-move="1" aria-label="Переместить ${esc(a.name)} ниже" ${accounts.indexOf(a) === accounts.length - 1 ? 'disabled' : ''}>↓</button></span>
+          <div class="grow"><div class="name">${esc(a.name)}</div><div class="note">${a.currency}</div></div>
+          <div class="amt ${b >= 0 ? 'in' : 'out'}">${money(b,a.currency)}</div>
+          <span class="drag-handle" aria-label="Перетащить счёт">⠿</span>
         </div>
       </div>`;
   }).join('') || '<div class="empty">Счетов нет</div>';
 
   $('account-list').querySelectorAll('.swipe').forEach((el) => {
     const aid = +el.querySelector('.li').dataset.id;
-    el.querySelectorAll('[data-move]').forEach((b) => (b.onclick = (e) => {
-      e.stopPropagation();
-      const i = accounts.findIndex((a) => a.id === aid), j = i + +b.dataset.move;
-      if (j < 0 || j >= accounts.length) return;
-      [accounts[i], accounts[j]] = [accounts[j], accounts[i]];
+    const handle=el.querySelector('.drag-handle');
+    handle.onpointerdown=(e)=>{
+      if(!orderingAccounts)return;
+      e.preventDefault(); handle.setPointerCapture(e.pointerId); el.classList.add('dragging');
+    };
+    handle.onpointermove=(e)=>{
+      if(!orderingAccounts||!handle.hasPointerCapture(e.pointerId))return;
+      const target=document.elementFromPoint(e.clientX,e.clientY)?.closest('#account-list .swipe');
+      if(!target||target===el)return;
+      const r=target.getBoundingClientRect();
+      target.parentNode.insertBefore(el,e.clientY<r.top+r.height/2?target:target.nextSibling);
+    };
+    handle.onpointerup=(e)=>{
+      if(!handle.hasPointerCapture(e.pointerId))return;
+      handle.releasePointerCapture(e.pointerId);
+      accounts=[...$('account-list').querySelectorAll('.swipe')].map(x=>accounts.find(a=>a.id===+x.dataset.account));
       save(); renderOverview();
-    }));
+    };
+    el.ondragstart = (e) => { if (!orderingAccounts) { e.preventDefault(); return; } e.dataTransfer.setData('text/plain', String(aid)); };
+    el.ondragover = (e) => { if (orderingAccounts) e.preventDefault(); };
+    el.ondrop = (e) => {
+      e.preventDefault();
+      const from = accounts.findIndex(a=>a.id===+e.dataTransfer.getData('text/plain')), to = accounts.findIndex(a=>a.id===aid);
+      if (from<0||to<0||from===to) return;
+      accounts.splice(to,0,accounts.splice(from,1)[0]); save(); renderOverview();
+    };
     bindSwipe(el, [
       { icon: 'pencil', cls: 'sw-edit', cb: () => editAcc(aid) },
       { icon: 'trash', cls: 'sw-del', cb: () => deleteAccount(aid) },
     ], () => editAcc(aid));
   });
 }
+$('order-mode').onclick = () => { orderingAccounts = !orderingAccounts; renderOverview(); };
 
 function deleteAccount(id) {
   const a = accounts.find((x) => x.id === id);
@@ -620,6 +667,7 @@ let anView = 'list';     // list | chart
 
 $('month-prev').onclick = () => shiftMonth(-1);
 $('month-next').onclick = () => shiftMonth(1);
+$('an-currency').onchange = renderAnalytics;
 function shiftMonth(d) {
   const [y, m] = anMonth.split('-').map(Number);
   const dt = new Date(y, m - 1 + d, 1);
@@ -636,7 +684,7 @@ function setAnSegUI() {
 }
 
 // Круговая диаграмма
-function donut(entries, total) {
+function donut(entries, total, currency) {
   const C = ['#9a8769', '#b5a385', '#7e8b76', '#a87669', '#777c72', '#c0b89d', '#8c7965', '#a19a89', '#777f80', '#b28f83'];
   let acc = 0;
   const segs = entries.map(([n, s], i) => {
@@ -645,16 +693,17 @@ function donut(entries, total) {
     acc += f;
     return seg;
   }).join('');
-  return `<div class="donut-wrap"><svg viewBox="0 0 42 42" class="donut">${segs}<text x="21" y="24.5" text-anchor="middle" class="donut-t">${fmt.format(total)}</text></svg></div>` +
+  return `<div class="donut-wrap"><svg viewBox="0 0 42 42" class="donut">${segs}<text x="21" y="24.5" text-anchor="middle" class="donut-t">${money(total,currency)}</text></svg></div>` +
     entries.map(([n, s], i) => `
       <div class="legend">
         <i style="background:${C[i % C.length]}"></i>
         <span class="grow">${esc(n)}</span>
-        <span class="legend-v">${Math.round((s / total) * 100)}% · ${fmt.format(s)}</span>
+        <span class="legend-v">${Math.round((s / total) * 100)}% · ${money(s,currency)}</span>
       </div>`).join('');
 }
 
 function renderAnalytics() {
+  const currency = $('an-currency').value;
   const [y, m] = anMonth.split('-').map(Number);
   const MN = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
   $('month-label').textContent = `${MN[m - 1]} ${y}`;
@@ -663,7 +712,7 @@ function renderAnalytics() {
   let mi = 0, me = 0;
   const byE = {}, byI = {};
   for (const t of txs) {
-    if (!t.date.startsWith(anMonth) || t.type === 'transfer') continue;
+    if (!t.date.startsWith(anMonth) || t.type === 'transfer' || txCurrency(t) !== currency) continue;
     if (t.type === 'income') { mi += t.amount; byI[t.category] = (byI[t.category] || 0) + t.amount; }
     else { me += t.amount; byE[t.category] = (byE[t.category] || 0) + t.amount; }
   }
@@ -671,6 +720,12 @@ function renderAnalytics() {
   // Бюджеты по категориям
   if (anMode === 'budget') {
     $('an-toggle').style.display = 'none';
+    if (currency !== 'RUB') {
+      $('an-total-lbl').textContent = 'Лимиты сейчас заданы в рублях';
+      $('an-total').textContent = 'Выбери RUB';
+      $('an-break').innerHTML = '<div class="empty">Для валютных расходов пока нет автоматического пересчёта бюджета</div>';
+      return;
+    }
     const totalLimit = Object.values(budgets).reduce((s, v) => s + v, 0);
     const spent = Object.entries(byE).reduce((s, [n, v]) => s + (budgets[n] ? v : 0), 0);
     const left = totalLimit - spent;
@@ -681,7 +736,7 @@ function renderAnalytics() {
       $('an-total').className = 'big sm';
     } else {
       $('an-total-lbl').textContent = left >= 0 ? 'Осталось от бюджета' : 'Перерасход';
-      $('an-total').textContent = fmt.format(Math.abs(left));
+      $('an-total').textContent = money(Math.abs(left), currency);
       $('an-total').className = 'big sm ' + (left >= 0 ? 'in' : 'out');
     }
 
@@ -698,8 +753,8 @@ function renderAnalytics() {
       const daysIn = new Date(ay, am, 0).getDate();
       const daysLeft = daysIn - new Date().getDate() + 1;
       const perDay = anMonth === month() && left > 0 ? Math.round(left / Math.max(1, daysLeft)) : null;
-      html += `<div class="bar"><div class="bar-top"><span>Потрачено <b>${fmt.format(spent)}</b> из ${fmt.format(totalLimit)}</span><span class="pct">${pct}%</span></div><div class="track"><i style="width:${w}%;background:${color}"></i></div></div>`;
-      if (perDay !== null) html += `<div class="budget-hint">Можно тратить <b>${fmt.format(perDay)}</b> в день · осталось ${daysLeft} дн.</div>`;
+      html += `<div class="bar"><div class="bar-top"><span>Потрачено <b>${money(spent,currency)}</b> из ${money(totalLimit,currency)}</span><span class="pct">${pct}%</span></div><div class="track"><i style="width:${w}%;background:${color}"></i></div></div>`;
+      if (perDay !== null) html += `<div class="budget-hint">Можно тратить <b>${money(perDay,currency)}</b> в день · осталось ${daysLeft} дн.</div>`;
     } else {
       html += '<div class="empty" style="margin-bottom:8px">Нажми на категорию, чтобы задать лимит</div>';
     }
@@ -709,7 +764,7 @@ function renderAnalytics() {
       const pct = Math.min(100, Math.round((s / lim) * 100));
       const color = pct >= 100 ? 'var(--red)' : pct >= 80 ? 'var(--acc)' : 'var(--green)';
       const rest = lim - s;
-      return `<div class="bar tap-budget" data-cat="${esc(n)}"><div class="bar-top"><span>${catIcon('expense', n)} ${esc(n)}</span><span><b>${fmt.format(s)}</b> <i class="pct">из ${fmt.format(lim)}</i></span></div><div class="track"><i style="width:${pct}%;background:${color}"></i></div><div class="budget-rest ${rest < 0 ? 'out' : ''}">${rest >= 0 ? 'Осталось ' + fmt.format(rest) : 'Перерасход ' + fmt.format(-rest)}</div></div>`;
+      return `<div class="bar tap-budget" data-cat="${esc(n)}"><div class="bar-top"><span>${catIcon('expense', n)} ${esc(n)}</span><span><b>${money(s,currency)}</b> <i class="pct">из ${money(lim,currency)}</i></span></div><div class="track"><i style="width:${pct}%;background:${color}"></i></div><div class="budget-rest ${rest < 0 ? 'out' : ''}">${rest >= 0 ? 'Осталось ' + money(rest,currency) : 'Перерасход ' + money(-rest,currency)}</div></div>`;
     }).join('');
 
     $('an-break').innerHTML = html;
@@ -725,13 +780,13 @@ function renderAnalytics() {
     $('an-toggle').style.display = 'none';
     const net = mi - me;
     $('an-total-lbl').textContent = 'Доходы − расходы';
-    $('an-total').textContent = fmtSign(net);
+    $('an-total').textContent = (net>=0?'+':'−')+money(Math.abs(net),currency);
     $('an-total').className = 'big sm ' + (net >= 0 ? 'in' : 'out');
     $('an-break').innerHTML = `
       <div class="cols">
-        <div><small>Доходы</small><b class="in">${fmt.format(mi)}</b></div>
-        <div><small>Расходы</small><b class="out">${fmt.format(me)}</b></div>
-        <div><small>Осталось</small><b>${fmt.format(net)}</b></div>
+        <div><small>Доходы</small><b class="in">${money(mi,currency)}</b></div>
+        <div><small>Расходы</small><b class="out">${money(me,currency)}</b></div>
+        <div><small>Осталось</small><b>${money(net,currency)}</b></div>
       </div>`;
     return;
   }
@@ -742,29 +797,30 @@ function renderAnalytics() {
   const total = isExp ? me : mi;
   const by = isExp ? byE : byI;
   $('an-total-lbl').textContent = (isExp ? 'Расходы' : 'Доходы') + ' за месяц';
-  $('an-total').textContent = fmt.format(total);
+  $('an-total').textContent = money(total,currency);
   $('an-total').className = 'big sm';
 
   const en = Object.entries(by).sort((a, b) => b[1] - a[1]);
   if (!en.length) { $('an-break').innerHTML = '<div class="empty">Нет данных за этот месяц</div>'; return; }
   $('an-break').innerHTML = anView === 'chart'
-    ? donut(en, total)
+     ? donut(en, total, currency)
     : en.map(([n, s]) => `
       <div class="bar">
-        <div class="bar-top"><span>${catIcon(isExp ? 'expense' : 'income', n)} ${esc(n)}</span><span><b>${fmt.format(s)}</b> <i class="pct">${Math.round((s / total) * 100)}%</i></span></div>
+        <div class="bar-top"><span>${catIcon(isExp ? 'expense' : 'income', n)} ${esc(n)}</span><span><b>${money(s,currency)}</b> <i class="pct">${Math.round((s / total) * 100)}%</i></span></div>
         <div class="track"><i style="width:${Math.round((s / total) * 100)}%"></i></div>
       </div>`).join('');
 }
 
 function renderTrend() {
   const months = Array.from({length:6},(_,i)=>{const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-5+i);return d.toISOString().slice(0,7)});
-  const vals=months.map(m=>txs.filter(t=>t.date.startsWith(m)&&t.type!=='transfer').reduce((a,t)=>{a[t.type==='income'?'inc':'out']+=t.amount;return a},{inc:0,out:0}));
+  const currency=$('an-currency').value;
+  const vals=months.map(m=>txs.filter(t=>t.date.startsWith(m)&&t.type!=='transfer'&&txCurrency(t)===currency).reduce((a,t)=>{a[t.type==='income'?'inc':'out']+=t.amount;return a},{inc:0,out:0}));
   const max=Math.max(1,...vals.flatMap(v=>[v.inc,v.out]));
   $('an-trend').innerHTML=vals.map((v,i)=>`<div class="trend"><span>${months[i].slice(5)}</span><i style="height:${Math.max(3,v.inc/max*70)}px;background:var(--green)"></i><i style="height:${Math.max(3,v.out/max*70)}px;background:var(--red)"></i></div>`).join('');
   const last=vals[5],prev=vals[4],catsNow={},catsPrev={};
-  txs.filter(t=>t.type==='expense').forEach(t=>{const m=t.date.slice(0,7),o=m===months[5]?catsNow:m===months[4]?catsPrev:null;if(o)o[t.category]=(o[t.category]||0)+t.amount});
+  txs.filter(t=>t.type==='expense'&&txCurrency(t)===currency).forEach(t=>{const m=t.date.slice(0,7),o=m===months[5]?catsNow:m===months[4]?catsPrev:null;if(o)o[t.category]=(o[t.category]||0)+t.amount});
   const n=Object.keys(catsNow).sort((a,b)=>catsNow[b]-catsNow[a])[0];
-  $('an-insights').textContent=n&&catsPrev[n]?`${n}: ${Math.round((catsNow[n]/catsPrev[n]-1)*100)}% к прошлому месяцу`:`Доходы ${fmt.format(last.inc)}, расходы ${fmt.format(last.out)} за месяц`;
+  $('an-insights').textContent=n&&catsPrev[n]?`${n}: ${Math.round((catsNow[n]/catsPrev[n]-1)*100)}% к прошлому месяцу`:`Доходы ${money(last.inc,currency)}, расходы ${money(last.out,currency)} за месяц`;
 }
 
 function renderGoals() {
@@ -807,11 +863,13 @@ function renderHistory() {
     return hay.includes(hQuery);
   };
   const shown = txs.filter(match);
-  const sumIn = shown.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-  const sumOut = shown.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-  const sumTransfer = shown.filter((t) => t.type === 'transfer').reduce((s, t) => s + t.amount, 0);
+  const sumText = (type) => {
+    const sums = {};
+    shown.filter(t=>t.type===type).forEach(t=>{const c=txCurrency(t);sums[c]=(sums[c]||0)+t.amount});
+    return Object.entries(sums).map(([c,v])=>money(v,c)).join(' + ') || money(0);
+  };
   $('h-sum').textContent = shown.length
-    ? `Найдено ${shown.length}: доходы ${fmt.format(sumIn)}, расходы ${fmt.format(sumOut)}, переводы ${fmt.format(sumTransfer)}`
+    ? `Найдено ${shown.length}: доходы ${sumText('income')}, расходы ${sumText('expense')}, переводы ${sumText('transfer')}`
     : 'Ничего не найдено';
   if (!shown.length) { box.innerHTML = '<div class="empty">Подходящих операций нет</div>'; return; }
 
@@ -834,7 +892,7 @@ function renderHistory() {
         <div class="li tap" data-id="${t.id}">
           <div class="ic">${tr ? svgIcon('transfer') : catIcon(t.type, t.category)}</div>
           <div class="grow"><div class="name">${tr ? 'Перевод' : esc(t.category)}</div>${t.note ? `<div class="note">${esc(t.note)}</div>` : ''}${tr ? `<div class="note">${from ? esc(from.name) : '—'} → ${to ? esc(to.name) : '—'}</div>` : acc ? `<div class="note">${esc(acc.name)}</div>` : ''}</div>
-          <div class="amt ${tr ? '' : inc ? 'in' : 'out'}">${tr ? '' : inc ? '+' : '−'}${fmt.format(t.amount)}</div>
+          <div class="amt ${tr ? '' : inc ? 'in' : 'out'}">${tr ? '' : inc ? '+' : '−'}${money(t.amount, txCurrency(t))}</div>
         </div>
       </div>`;
   }
@@ -950,13 +1008,14 @@ function renderCats() {
 function renderPays() {
   const now=new Date(), next=p=>{let d=new Date(now.getFullYear(),now.getMonth(),Math.min(p.day,new Date(now.getFullYear(),now.getMonth()+1,0).getDate()));if(d<new Date(now.getFullYear(),now.getMonth(),now.getDate()))d=new Date(now.getFullYear(),now.getMonth()+1,Math.min(p.day,new Date(now.getFullYear(),now.getMonth()+2,0).getDate()));return d};
   const accName = (id) => (accounts.find((a) => a.id === +id) || {}).name || (accounts[0] || {}).name || 'Счёт не выбран';
-  const upcoming=pays.reduce((s,p)=>s+p.amount,0);
-  $('autopay-list').innerHTML = (pays.length?`<div class="sec">В месяц: ${fmt.format(upcoming)}</div>`:'')+(pays.length ? [...pays].sort((a,b)=>next(a)-next(b)).map((p) => `
+  const sums={}; pays.forEach(p=>{const c=(accounts.find(a=>a.id==p.account)||accounts[0]||{}).currency||'RUB';sums[c]=(sums[c]||0)+p.amount});
+  const upcoming=Object.entries(sums).map(([c,v])=>money(v,c)).join(' + ');
+  $('autopay-list').innerHTML = (pays.length?`<div class="sec">В месяц: ${upcoming}</div>`:'')+(pays.length ? [...pays].sort((a,b)=>next(a)-next(b)).map((p) => `
     <div class="swipe">
       <div class="swipe-actions"></div>
       <div class="li" data-id="${p.id}">
         <div class="ic">${svgIcon('refresh')}</div>
-        <div class="grow"><div class="name">${esc(p.name)}</div><div class="note">${formatDate(next(p).toISOString().slice(0,10))} · ${fmt.format(p.amount)} · ${esc(accName(p.account))}</div></div>
+        <div class="grow"><div class="name">${esc(p.name)}</div><div class="note">${formatDate(next(p).toISOString().slice(0,10))} · ${money(p.amount,(accounts.find(a=>a.id==p.account)||accounts[0]||{}).currency||'RUB')} · ${esc(accName(p.account))}</div></div>
       </div>
     </div>`).join('') : '<div class="empty">Автоплатежей нет. Нажми «Добавить», чтобы настроить</div>');
   $('autopay-list').querySelectorAll('.swipe').forEach((el) => {

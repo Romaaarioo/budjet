@@ -360,13 +360,15 @@ body::before, body::after { display: none !important; animation: none !important
 .swipe-actions { z-index: 0; }
 .swipe > .li, .swipe > .card { z-index: 1; }
 .swipe { isolation: isolate; }
-.order-controls { display: flex; flex-direction: column; gap: 2px; margin-left: 2px; }
-.order-controls button {
-  width: 28px; height: 22px; border: 1px solid var(--sep); border-radius: 7px;
-  background: var(--field); color: var(--muted); font-size: 13px; line-height: 1;
-}
-.order-controls button:disabled { opacity: .35; }
-.order-controls button:active { color: var(--acc); background: var(--card); }
+.order-mode { display:block; margin: 0 0 10px auto; border:0; background:none; color:var(--acc); font-weight:600; font-size:14px; font-family:inherit; padding:8px 4px; }
+.drag-handle { display:none; color:var(--muted); font-size:22px; padding:4px 8px; cursor:grab; touch-action:none; }
+#account-list.ordering .drag-handle { display:block; }
+#account-list.ordering .dragging { opacity:.5; }
+.balance-total { display:inline-block; margin-right:12px; }
+.row .switch { margin-left:auto; }
+#account-list.ordering .li { pointer-events:none; }
+#account-list.ordering .drag-handle { pointer-events:auto; }
+#account-list.ordering .swipe { opacity:.85; }
 .emoji-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); max-height: 142px; overflow: auto; padding: 2px; }
 .emoji-row button { min-width: 0; font-size: 20px; }
 .emoji-row button:active, .btn:active, .tab:active, .nav-arrow:active { filter: brightness(1.18); }
@@ -375,6 +377,7 @@ body::before, body::after { display: none !important; animation: none !important
 .goal-swipe .card { margin-bottom: 0; }
 .swipe-actions button { opacity: 1; }
 .trend i { transition: height .28s ease; }
+.currency-filter { margin: 0 0 12px; }
 button, .card, .li, .seg-btn, .tab, .switch i { -webkit-tap-highlight-color: transparent; }
 
 @media (prefers-reduced-motion: reduce) {
