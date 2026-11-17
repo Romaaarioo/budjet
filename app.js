@@ -991,7 +991,6 @@ function renderCashback() {
   $('cb-categories').onclick=e=>{const b=e.target.closest('[data-cat]');if(b){cbFilter=b.dataset.cat;cbMode='categories';document.querySelectorAll('[data-cb-view]').forEach(x=>x.classList.toggle('on',x.dataset.cbView==='categories'));renderCashback();}};
   $('cb-categories').hidden=cbMode!=='categories';
   $('cb-section-name').textContent=cbMode==='offers'?'Специальные акции':cbMode==='banks'?'Все банки':cbFilter;
-  $('cb-section-icon').textContent=cbMode==='offers'?'◉':cbMode==='banks'?'▱':'▦';
   let shown=cards;
   if(cbMode==='categories'&&cbFilter!=='Всё')shown=cards.filter(c=>(c.slots||[]).some(s=>s.cat===cbFilter));
   $('cb-count').textContent=cbMode==='banks'?cards.reduce((s,c)=>s+(c.slots||[]).length,0):shown.length;

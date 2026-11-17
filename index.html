@@ -7,7 +7,7 @@
   <title>Мои Финансы</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="style.css?v=31">
+  <link rel="stylesheet" href="style.css?v=32">
   <script>
     // Тема и Liquid Glass применяются до отрисовки, чтобы не «мигало»
     const t = localStorage.getItem('fin_theme') || 'dark';
@@ -83,17 +83,17 @@
   </section>
 
   <section id="view-cashback" class="view cashback-app">
+    <h1 class="title">Кэшбэк</h1>
     <header class="cb-top">
-      <div class="cb-brand"><span class="cb-mark">%</span><strong>Кэшбэк-трекер</strong></div>
       <nav class="cb-tabs" aria-label="Разделы кэшбэка">
-        <button class="on" data-cb-view="categories">▦ <span>Категории</span></button>
-        <button data-cb-view="offers">◉ <span>Спец. акции</span></button>
-        <button data-cb-view="banks">▱ <span>Банки</span></button>
+        <button class="on" data-cb-view="categories"><span>Категории</span></button>
+        <button data-cb-view="offers"><span>Спец. акции</span></button>
+        <button data-cb-view="banks"><span>Банки</span></button>
       </nav>
     </header>
-    <div class="cb-actions"><div class="cb-chips" id="cb-categories"></div><button class="cb-purchase" id="add-cb">♧ <span>Покупка</span></button></div>
     <div class="cb-summary"><span>Получено в этом месяце <b id="cb-month">0 ₽</b></span><span id="cb-total">Всего: 0 ₽</span></div>
-    <div class="cb-section-title"><span class="cb-section-icon" id="cb-section-icon">▦</span><strong id="cb-section-name">Все</strong><span class="cb-count" id="cb-count">0</span></div>
+    <div class="cb-actions"><div class="cb-chips" id="cb-categories"></div><button class="cb-purchase" id="add-cb">＋ <span>Отметить кэшбэк</span></button></div>
+    <div class="cb-section-title"><strong id="cb-section-name">Все</strong><span class="cb-count" id="cb-count">0</span></div>
     <div class="cb-list" id="card-list"></div>
     <div class="cb-footer"><button class="cb-text-btn" id="add-card">＋ Добавить банк</button><button class="cb-text-btn" id="add-cb-cat">＋ Добавить категорию</button></div>
   </section>
@@ -264,7 +264,7 @@
   </div>
 </div>
 
-<script src="app.js?v=31"></script>
+<script src="app.js?v=32"></script>
 </body>
 </html>
 
