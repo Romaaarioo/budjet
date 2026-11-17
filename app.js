@@ -461,7 +461,7 @@ $('cat-form').onsubmit = (e) => {
 
 $('acc-form').onsubmit = (e) => {
   e.preventDefault();
-  const d = { name: $('acc-name').value.trim(), icon: $('acc-form').dataset.icon };
+  const d = { name: $('acc-name').value.trim(), icon: $('acc-form').dataset.icon, currency: $('acc-currency').value };
   if (editingAcc) {
     const a = accounts.find((x) => x.id === editingAcc);
     const flow = txs.reduce((s,t) => t.type === 'transfer' ? s + (t.to === a.id ? (t.toAmount ?? t.amount) : t.from === a.id ? -t.amount : 0) : t.account === a.id ? s + (t.type === 'income' ? t.amount : -t.amount) : s, 0);
@@ -541,7 +541,7 @@ function editAcc(id) {
   $('acc-current-wrap').hidden = false;
   $('acc-current').value = accountBalance(a);
   $('acc-currency').value = a.currency || 'RUB';
-  $('acc-currency').disabled = txs.some((t) => t.account === a.id || (t.type === 'transfer' && (t.from === a.id || t.to === a.id)));
+  $('acc-currency').disabled = false;
   pickEmoji($('acc-form'), a.icon);
 }
 
