@@ -605,7 +605,7 @@ function renderOverview() {
         <div class="swipe-actions"></div>
         <div class="li tap" data-id="${a.id}">
           <div class="ic">${renderIcon(a.icon)}</div>
-          <div class="grow"><div class="name">${esc(a.name)}</div><div class="note">${a.currency}</div></div>
+          <div class="grow"><div class="name">${esc(a.name)}</div></div>
           <div class="amt ${b >= 0 ? 'in' : 'out'}">${money(b,a.currency)}</div>
           <span class="drag-handle" aria-label="Перетащить счёт">⠿</span>
         </div>
