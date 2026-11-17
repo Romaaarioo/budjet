@@ -427,7 +427,8 @@ body::before, body::after { display: none !important; animation: none !important
 .tx-cashback { margin:2px 0 14px; padding:12px; border:1px solid var(--sep); border-radius:14px; background:var(--field); }
 .tx-cashback label { margin-bottom:8px; }
 .cb-estimate { color:var(--muted); font-size:12px; line-height:1.45; }
-.tx-cashback-note { color:var(--green); }
+.amt-wrap { flex:0 0 auto; text-align:right; }
+.tx-cashback-note { margin-top:3px; color:var(--green); font-size:11px; white-space:nowrap; }
 .tx-limit-track { height:6px; margin:7px 0; overflow:hidden; border-radius:5px; background:var(--card); }
 .tx-limit-track i { display:block; width:0; height:100%; border-radius:5px; background:var(--acc); transition:width .2s ease; }
 .cb-empty { padding:30px 16px; color:var(--muted); text-align:center; }

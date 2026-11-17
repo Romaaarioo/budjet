@@ -978,8 +978,8 @@ function renderHistory() {
         <div class="swipe-actions"></div>
         <div class="li tap" data-id="${t.id}">
           <div class="ic">${tr ? svgIcon('transfer') : catIcon(t.type, t.category)}</div>
-          <div class="grow"><div class="name">${tr ? 'Перевод' : esc(t.category)}</div>${t.note ? `<div class="note">${esc(t.note)}</div>` : ''}${tr ? `<div class="note">${from ? esc(from.name) : '—'} → ${to ? esc(to.name) : '—'}</div>` : acc ? `<div class="note">${esc(acc.name)}</div>` : ''}${t.cashback?.amount>0?`<div class="note tx-cashback-note">Кэшбэк · ${money(t.cashback.amount,txCurrency(t))}</div>`:''}</div>
-          <div class="amt ${tr ? '' : inc ? 'in' : 'out'}">${tr ? '' : inc ? '+' : '−'}${money(t.amount, txCurrency(t))}</div>
+          <div class="grow"><div class="name">${tr ? 'Перевод' : esc(t.category)}</div>${t.note ? `<div class="note">${esc(t.note)}</div>` : ''}${tr ? `<div class="note">${from ? esc(from.name) : '—'} → ${to ? esc(to.name) : '—'}</div>` : acc ? `<div class="note">${esc(acc.name)}</div>` : ''}</div>
+          <div class="amt-wrap"><div class="amt ${tr ? '' : inc ? 'in' : 'out'}">${tr ? '' : inc ? '+' : '−'}${money(t.amount, txCurrency(t))}</div>${t.cashback?.amount>0?`<div class="tx-cashback-note">Кэшбэк · ${money(t.cashback.amount,txCurrency(t))}</div>`:''}</div>
         </div>
       </div>`;
   }
