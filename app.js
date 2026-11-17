@@ -19,6 +19,7 @@ const save = () => {
   localStorage.setItem('fin_budgets', JSON.stringify(budgets));
   localStorage.setItem('fin_goals', JSON.stringify(goals));
   localStorage.setItem('fin_cb_categories', JSON.stringify(cashbackCats));
+  localStorage.setItem('fin_cb_offers', JSON.stringify(cbOffers));
 };
 
 // ---------- SVG-иконки (стиль Lucide) ----------
@@ -64,16 +65,18 @@ let pays = load('fin_autopays', []);      // автоплатежи
 let accounts = load('fin_accounts', []);  // счета
 let cards = load('fin_cards', []);        // карты для кэшбэка
 let cashbackCats = load('fin_cb_categories', null) || ['Всё','Продукты','Аптеки','Кафе и рестораны','Фастфуд','Одежда и обувь','Транспорт','Зоотовары','ЖД','Техника','Кино','Развлечения','Спорттовары','Дом и ремонт','Такси','Цветы','Фитнес','Маркетплейсы','Авиабилеты','Красота','Мед. услуги','Путешествия'].map((name,i)=>({name,icon:['✨','🛒','💊','🍽️','🍔','👕','🚇','🐾','🚆','💻','🎬','🎭','🏋️','🛠️','🚕','💐','🧘','📦','✈️','💄','🩺','🧳'][i]}));
+let cbOffers = load('fin_cb_offers', []);
 let cbs = load('fin_cashback', []);       // полученный кэшбэк
 let budgets = load('fin_budgets', {});    // лимиты: категория → сумма в месяц
 let goals = load('fin_goals', []);
-const BANKS = [['Альфа',3,'#ef3124','А'],['ВТБ',4,'#00a7e1','ВТБ'],['Озон',4,'#005bff','O'],['Т-Банк',4,'#ffdd2d','Т'],['Сбер',3,'#21a038','С'],['МТС',5,'#e30611','МТС'],['Яндекс',5,'#fc3f1d','Я'],['ОТП',4,'#d71920','ОТП'],['Яндекс ПРО',6,'#fc3f1d','ЯП'],['Апельсин',3,'#ff8c00','А'],['WB',4,'#cb11ab','WB'],['БКС',4,'#172d5c','БКС']];
+const BANKS = [['Альфа',3,'#ef3124','А',5000],['ВТБ',4,'#00a7e1','ВТБ',3000],['Озон',4,'#005bff','O',3000],['Т-Банк',4,'#ffdd2d','Т',3000],['Сбер',3,'#21a038','С',2000],['МТС',5,'#e30611','МТС',10000],['Яндекс',5,'#fc3f1d','Я',10000],['ОТП',4,'#d71920','ОТП',3000],['Яндекс ПРО',6,'#fc3f1d','ЯП',10000],['Апельсин',3,'#ff8c00','А',50000],['WB',4,'#cb11ab','WB',null],['БКС',4,'#172d5c','БКС',null]];
 let cashbackSeeded=false;
 cards.forEach(c=>{if(!c.slots)c.slots=[{cat:c.cat||'Всё',pct:c.pct||0}];});
-BANKS.forEach(([name,count,color,mark],i)=>{
+BANKS.forEach(([name,count,color,mark,limit],i)=>{
   let c=cards.find(x=>x.name.toLowerCase()===name.toLowerCase());
-  if(!c){c={id:Date.now()+i,name,cat:'Всё',pct:0,slots:[]};cards.push(c);cashbackSeeded=true;}
+  if(!c){c={id:Date.now()+i,name,cat:'Всё',pct:0,slots:[],monthlyLimit:limit};cards.push(c);cashbackSeeded=true;}
   if(!c.logo){c.logo={color,mark};cashbackSeeded=true;} else c.logo={color,mark};
+  if(c.monthlyLimit===undefined){c.monthlyLimit=limit;cashbackSeeded=true;}
   while(c.slots.length<count){c.slots.push({cat:'Всё',pct:0});cashbackSeeded=true;}
 });
 if(cashbackSeeded||!localStorage.getItem('fin_cb_categories')) {
@@ -133,6 +136,21 @@ function formatDate(iso) {
   const [y, m, d] = iso.split('-').map(Number);
   const M = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
   return `${d} ${M[m - 1]}` + (y !== new Date().getFullYear() ? ` ${y}` : '');
+}
+
+const bankPool = (b) => b && b.name.startsWith('Яндекс') ? 'Яндекс' : b && String(b.id);
+function cashbackUsed(bank, excludeId = null) {
+  const key=bankPool(bank);
+  const fromTx=txs.reduce((s,t)=>t.id!==excludeId&&t.type==='expense'&&t.cashback&&bankPool(cards.find(c=>c.id===t.cashback.bankId))===key&&t.date.startsWith(month())?s+(+t.cashback.amount||0):s,0);
+  const fromManual=cbs.reduce((s,c)=>bankPool(cards.find(b=>b.id===+c.card))===key&&c.date.startsWith(month())?s+c.amount:s,0);
+  return fromTx+fromManual;
+}
+function cashbackQuote(amount, bank, slot, excludeId = null) {
+  if(!bank||!slot||!(+slot.pct>0))return {value:0,remaining:bank?.monthlyLimit??Infinity,eligible:0};
+  const eligible=Math.floor(Math.max(0,+amount||0)/100)*100;
+  const raw=Math.round(eligible*(+slot.pct)/100);
+  const used=cashbackUsed(bank,excludeId), remaining=bank.monthlyLimit==null?Infinity:Math.max(0,bank.monthlyLimit-used);
+  return {value:Math.min(raw,remaining),remaining,eligible};
 }
 
 // ---------- Свайп строк: редактирование и удаление ----------
@@ -211,7 +229,7 @@ glassBox.onchange = () => {
   localStorage.setItem('fin_glass', glassBox.checked);
 };
 
-const DATA_KEYS = ['fin_transactions', 'fin_investments', 'fin_categories', 'fin_autopays', 'fin_accounts', 'fin_cards', 'fin_cashback', 'fin_budgets', 'fin_goals', 'fin_cb_categories'];
+const DATA_KEYS = ['fin_transactions', 'fin_investments', 'fin_categories', 'fin_autopays', 'fin_accounts', 'fin_cards', 'fin_cashback', 'fin_budgets', 'fin_goals', 'fin_cb_categories', 'fin_cb_offers'];
 $('export-data').onclick = () => {
   const data = { app: 'moi-finansy', exported: new Date().toISOString() };
   DATA_KEYS.forEach((k) => (data[k] = JSON.parse(localStorage.getItem(k) || 'null')));
@@ -238,7 +256,7 @@ $('import-file').onchange = async (e) => {
 
 $('clear-data').onclick = () => {
   if (confirm('Удалить ВСЕ данные? Действие необратимо.')) {
-    ['fin_transactions', 'fin_investments', 'fin_categories', 'fin_autopays', 'fin_accounts', 'fin_cards', 'fin_cashback', 'fin_budgets', 'fin_goals', 'fin_cb_categories'].forEach((k) => localStorage.removeItem(k));
+    ['fin_transactions', 'fin_investments', 'fin_categories', 'fin_autopays', 'fin_accounts', 'fin_cards', 'fin_cashback', 'fin_budgets', 'fin_goals', 'fin_cb_categories', 'fin_cb_offers'].forEach((k) => localStorage.removeItem(k));
     location.reload();
   }
 };
@@ -268,15 +286,18 @@ let editingBudget = null; // категория редактируемого л�
 let editingGoal = null;
 let editingPay = null;
 let editingCat = null;
+let cbManualOverride=false;
+let editingOffer=null;
 
 function openModal(kind) {
-  ['tx', 'inv', 'cat', 'pay', 'acc', 'card', 'cb', 'budget', 'goal'].forEach((k) => ($(`${k}-form`).hidden = k !== kind));
+  ['tx', 'inv', 'cat', 'pay', 'acc', 'card', 'cb', 'budget', 'goal', 'cb-offer', 'cbcat'].forEach((k) => ($(`${k}-form`).hidden = k !== kind));
   modal.classList.add('open');
   document.body.style.overflow = 'hidden'; // фон не скроллится, пока открыто окно
   if (kind === 'tx' && editingTx === null) {
     setSeg($('tx-form'), 'expense');
     $('tx-amount').value = ''; $('tx-note').value = '';
     $('tx-date').value = todayISO(); fillCat(); fillAcc(); syncTxForm();
+    fillTxCashback(); cbManualOverride=false;
     $('tx-repeat').hidden = !txs.length;
   }
   if (kind === 'cat' && !editingCat) {
@@ -294,6 +315,11 @@ function openModal(kind) {
     pickEmoji($('acc-form'), 'cash'); $('acc-emoji').value = '';
   }
   if (kind === 'cb') { $('cb-date').value = todayISO(); fillCbCards(); }
+  if (kind === 'cb-offer') {
+    $('offer-bank').innerHTML=cards.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
+    $('offer-date').value='';
+    updateOfferMaxOrder();
+  }
   if (kind === 'card') {
     fillCbCards();
     $('cb-card-name').parentElement.hidden = !!editingCard;
@@ -324,6 +350,8 @@ function closeModal() {
   editingPay = null;
   editingCat = null;
   cbSlotIndex = null;
+  cbManualOverride=false;
+  editingOffer=null;
 }
 $('fab').onclick = () => openModal('tx');
 modal.onclick = (e) => { if (e.target === modal) closeModal(); };
@@ -397,11 +425,13 @@ function syncTxForm() {
   $('tx-cat-wrap').hidden = tr;
   $('tx-acc-wrap').hidden = tr;
   $('tx-transfer-wrap').hidden = !tr;
+  $('tx-cashback').hidden = tr || $('tx-form').dataset.type !== 'expense';
   const acc = accounts.find(a=>a.id===+(tr ? $('tx-from').value : $('tx-account').value));
   $('tx-amount-label').firstChild.textContent = `Сумма · ${acc?.currency||'RUB'}`;
   if (tr && accounts.length > 1 && $('tx-from').value === $('tx-to').value) {
     $('tx-to').value = accounts.find((a) => a.id !== +$('tx-from').value).id;
   }
+  if(!tr)updateTxCashback();
 }
 $('tx-account').onchange = syncTxForm;
 $('tx-from').onchange = syncTxForm;
@@ -409,6 +439,35 @@ function fillCbCards() {
   $('cb-card').innerHTML = cards.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
   $('cb-card-cat').innerHTML = cashbackCats.map((c) => `<option value="${esc(c.name)}">${esc(c.icon)} ${esc(c.name)}</option>`).join('');
 }
+function fillTxCashback(bankId='', slotIndex=null) {
+  $('tx-cb-bank').innerHTML='<option value="">Без кэшбэка</option>'+cards.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  $('tx-cb-bank').value=bankId||'';
+  fillTxSlots(slotIndex);
+}
+function fillTxSlots(selected=null) {
+  const bank=cards.find(c=>c.id===+$('tx-cb-bank').value);
+  const slots=(bank?.slots||[]).map((s,i)=>({...s,i})).filter(s=>(+s.pct||0)>0);
+  $('tx-cb-slot').innerHTML=slots.map(s=>`<option value="${s.i}">${esc(s.cat)} · ${s.pct}%${s.condition?` — ${esc(s.condition)}`:''}</option>`).join('');
+  $('tx-cb-cat-wrap').hidden=!slots.length;
+  if(slots.length)$('tx-cb-slot').value=selected==null?String(slots[0].i):String(selected);
+  updateTxCashback();
+}
+function updateTxCashback() {
+  if(!$('tx-cb-bank')||$('tx-form').dataset.type!=='expense')return;
+  const bank=cards.find(c=>c.id===+$('tx-cb-bank').value),slot=bank?.slots?.[+$('tx-cb-slot').value];
+  const q=cashbackQuote(+$('tx-amount').value,bank,slot,editingTx);
+  const value=cbManualOverride?Math.min(+$('tx-cb-amount').value||0,q.remaining):q.value;
+  $('tx-cb-amount').value=value||'';
+  $('tx-cb-amount-wrap').hidden=!bank||!slot||!(+slot.pct>0);
+  $('tx-cb-progress-wrap').hidden=!bank||bank.monthlyLimit==null;
+  if(bank?.monthlyLimit>0)$('tx-cb-progress').style.width=`${Math.min(100,Math.max(0,(bank.monthlyLimit-q.remaining+value)/bank.monthlyLimit*100))}%`;
+  const limit=bank?.monthlyLimit;
+  $('tx-cb-estimate').textContent=bank&&slot&&+slot.pct>0?`${q.eligible} ₽ учитывается · лимит: ${limit==null?'без лимита':`${money(Math.max(0,limit-q.remaining))} из ${money(limit)}`} · после покупки останется ${limit==null?'без лимита':money(Math.max(0,q.remaining-value))}`:'';
+}
+$('tx-cb-bank').onchange=()=>{cbManualOverride=false;fillTxSlots();};
+$('tx-cb-slot').onchange=()=>{cbManualOverride=false;updateTxCashback();};
+$('tx-cb-amount').oninput=()=>{cbManualOverride=true;updateTxCashback();};
+$('tx-amount').addEventListener('input',()=>{cbManualOverride=false;updateTxCashback();});
 
 // Выбор иконки (для категорий и счетов)
 const CAT_EMOJIS = ['food','cart','bus','home','play','heart','shirt','plane','cap','paw','case','laptop','gift','sparkle','box','card','🍎','🥑','🥩','🥐','🍔','🍕','🍜','☕','🍰','🧋','🚕','🚇','🚲','⛽','🛞','🧹','🛋️','🪴','🔧','🧻','🧴','💊','🩺','🧘','🏋️','⚽','🎮','🎟️','🎨','📚','🎧','📱','⌚','📺','📶','🔌','🧳','🏖️','🏨','🌿','🐶','🐱','👶','💐','💸','🧾','💡','🔑','🧺','🛍️','💝','🤝','🩸','🏆','📑'];
@@ -441,12 +500,14 @@ $('tx-form').onsubmit = (e) => {
     const from = +$('tx-from').value, to = +$('tx-to').value;
     if (from === to) { alert('Выбери разные счета'); return; }
     if (accounts.find(a=>a.id===from)?.currency !== accounts.find(a=>a.id===to)?.currency) { alert('Переводы между разными валютами пока недоступны без курса'); return; }
-    d = { type, amount: +$('tx-amount').value, from, to, note: $('tx-note').value.trim(), date: $('tx-date').value || todayISO() };
+    d = { type, amount: +$('tx-amount').value, from, to, cashback:null, note: $('tx-note').value.trim(), date: $('tx-date').value || todayISO() };
   } else {
+    const bank=cards.find(c=>c.id===+$('tx-cb-bank').value),slotIndex=+$('tx-cb-slot').value,slot=bank?.slots?.[slotIndex];
     d = {
       type, amount: +$('tx-amount').value,
       category: $('tx-category').value, account: +$('tx-account').value,
       currency: accounts.find(a=>a.id===+$('tx-account').value)?.currency || 'RUB',
+      cashback: type==='expense'&&bank&&slot&&+slot.pct>0?{bankId:bank.id,slotIndex,category:slot.cat,percent:+slot.pct,amount:+$('tx-cb-amount').value||0,manual:cbManualOverride}:null,
       note: $('tx-note').value.trim(), date: $('tx-date').value || todayISO(),
     };
   }
@@ -496,11 +557,29 @@ $('card-form').onsubmit = (e) => {
   e.preventDefault();
   if (editingCard) {
     const c=cards.find(x=>x.id===editingCard);
-    const slot={cat:$('cb-card-cat').value,pct:+$('cb-card-pct').value};
+    const slot={cat:$('cb-card-cat').value,pct:+$('cb-card-pct').value,condition:$('cb-card-condition').value.trim()};
     if(cbSlotIndex==null)c.slots.push(slot);else c.slots[cbSlotIndex]=slot;
-  } else cards.push({id:Date.now(),name:$('cb-card-name').value.trim(),logo:{color:'#8b7049',mark:$('cb-card-name').value.trim().slice(0,2).toUpperCase()},cat:$('cb-card-cat').value,pct:+$('cb-card-pct').value,slots:[{cat:$('cb-card-cat').value,pct:+$('cb-card-pct').value}]});
+  } else cards.push({id:Date.now(),name:$('cb-card-name').value.trim(),logo:{color:'#8b7049',mark:$('cb-card-name').value.trim().slice(0,2).toUpperCase()},cat:$('cb-card-cat').value,pct:+$('cb-card-pct').value,slots:[{cat:$('cb-card-cat').value,pct:+$('cb-card-pct').value,condition:$('cb-card-condition').value.trim()}]});
   cbSlotIndex=null;
   save(); renderAll(); closeModal();
+};
+$('cbcat-form').onsubmit=(e)=>{
+  e.preventDefault();
+  const name=$('cbcat-name').value.trim();
+  if(cashbackCats.some(c=>c.name.toLowerCase()===name.toLowerCase())){alert('Такая категория уже есть');return;}
+  cashbackCats.push({name,icon:$('cbcat-icon').value.trim()||'✨'});
+  save();fillCbCards();renderCashback();closeModal();
+};
+function updateOfferMaxOrder(){
+  const pct=+$('offer-pct').value, max=+$('offer-max-cb').value;
+  $('offer-max-order').value=pct>0&&max>0?Math.floor(max/(pct/100)):'';
+}
+$('offer-pct').oninput=$('offer-max-cb').oninput=updateOfferMaxOrder;
+$('cb-offer-form').onsubmit=(e)=>{
+  e.preventDefault();
+  const pct=+$('offer-pct').value,maxCashback=+$('offer-max-cb').value;
+  cbOffers.push({id:Date.now(),name:$('offer-name').value.trim(),bank:+$('offer-bank').value,pct,maxCashback,maxOrder:Math.floor(maxCashback/(pct/100)),date:$('offer-date').value});
+  save();renderCashback();closeModal();
 };
 
 $('cb-form').onsubmit = (e) => {
@@ -552,6 +631,10 @@ function editTx(id) {
     $('tx-category').value = t.category;
     $('tx-account').value = t.account || (accounts[0] && accounts[0].id);
   }
+  fillTxCashback(t.cashback?.bankId||'',t.cashback?.slotIndex??null);
+  cbManualOverride=!!t.cashback?.manual;
+  if(t.cashback)$('tx-cb-amount').value=t.cashback.amount;
+  syncTxForm();
   $('tx-note').value = t.note || '';
   $('tx-date').value = t.date;
 }
@@ -625,45 +708,24 @@ function renderOverview() {
   $('account-list').innerHTML = accounts.map((a) => {
     const b = accountBalance(a);
     return `
-      <div class="swipe" data-account="${a.id}" draggable="${orderingAccounts}">
+      <div class="swipe" data-account="${a.id}">
         <div class="swipe-actions"></div>
         <div class="li tap" data-id="${a.id}">
           <div class="ic">${renderIcon(a.icon)}</div>
           <div class="grow"><div class="name">${esc(a.name)}</div></div>
           <div class="amt ${b >= 0 ? 'in' : 'out'}">${money(b,a.currency)}</div>
-          <span class="drag-handle" aria-label="Перетащить счёт">⠿</span>
+          <span class="account-order-controls"><button type="button" data-move="-1" aria-label="Выше">↑</button><button type="button" data-move="1" aria-label="Ниже">↓</button></span>
         </div>
       </div>`;
   }).join('') || '<div class="empty">Счетов нет</div>';
 
   $('account-list').querySelectorAll('.swipe').forEach((el) => {
     const aid = +el.querySelector('.li').dataset.id;
-    const handle=el.querySelector('.drag-handle');
-    handle.onpointerdown=(e)=>{
-      if(!orderingAccounts)return;
-      e.preventDefault(); handle.setPointerCapture(e.pointerId); el.classList.add('dragging');
-    };
-    handle.onpointermove=(e)=>{
-      if(!orderingAccounts||!handle.hasPointerCapture(e.pointerId))return;
-      const target=document.elementFromPoint(e.clientX,e.clientY)?.closest('#account-list .swipe');
-      if(!target||target===el)return;
-      const r=target.getBoundingClientRect();
-      target.parentNode.insertBefore(el,e.clientY<r.top+r.height/2?target:target.nextSibling);
-    };
-    handle.onpointerup=(e)=>{
-      if(!handle.hasPointerCapture(e.pointerId))return;
-      handle.releasePointerCapture(e.pointerId);
-      accounts=[...$('account-list').querySelectorAll('.swipe')].map(x=>accounts.find(a=>a.id===+x.dataset.account));
-      save(); renderOverview();
-    };
-    el.ondragstart = (e) => { if (!orderingAccounts) { e.preventDefault(); return; } e.dataTransfer.setData('text/plain', String(aid)); };
-    el.ondragover = (e) => { if (orderingAccounts) e.preventDefault(); };
-    el.ondrop = (e) => {
-      e.preventDefault();
-      const from = accounts.findIndex(a=>a.id===+e.dataTransfer.getData('text/plain')), to = accounts.findIndex(a=>a.id===aid);
-      if (from<0||to<0||from===to) return;
-      accounts.splice(to,0,accounts.splice(from,1)[0]); save(); renderOverview();
-    };
+    el.querySelectorAll('[data-move]').forEach(b=>b.onclick=e=>{
+      e.stopPropagation();const i=accounts.findIndex(a=>a.id===aid),j=i+(+b.dataset.move);
+      if(j<0||j>=accounts.length)return;
+      [accounts[i],accounts[j]]=[accounts[j],accounts[i]];save();renderOverview();
+    });
     bindSwipe(el, [
       { icon: 'pencil', cls: 'sw-edit', cb: () => editAcc(aid) },
       { icon: 'trash', cls: 'sw-del', cb: () => deleteAccount(aid) },
@@ -916,7 +978,7 @@ function renderHistory() {
         <div class="swipe-actions"></div>
         <div class="li tap" data-id="${t.id}">
           <div class="ic">${tr ? svgIcon('transfer') : catIcon(t.type, t.category)}</div>
-          <div class="grow"><div class="name">${tr ? 'Перевод' : esc(t.category)}</div>${t.note ? `<div class="note">${esc(t.note)}</div>` : ''}${tr ? `<div class="note">${from ? esc(from.name) : '—'} → ${to ? esc(to.name) : '—'}</div>` : acc ? `<div class="note">${esc(acc.name)}</div>` : ''}</div>
+          <div class="grow"><div class="name">${tr ? 'Перевод' : esc(t.category)}</div>${t.note ? `<div class="note">${esc(t.note)}</div>` : ''}${tr ? `<div class="note">${from ? esc(from.name) : '—'} → ${to ? esc(to.name) : '—'}</div>` : acc ? `<div class="note">${esc(acc.name)}</div>` : ''}${t.cashback?.amount>0?`<div class="note tx-cashback-note">Кэшбэк · ${money(t.cashback.amount,txCurrency(t))}</div>`:''}</div>
           <div class="amt ${tr ? '' : inc ? 'in' : 'out'}">${tr ? '' : inc ? '+' : '−'}${money(t.amount, txCurrency(t))}</div>
         </div>
       </div>`;
@@ -983,27 +1045,38 @@ document.querySelectorAll('[data-cb-view]').forEach(b=>b.onclick=()=>{
 });
 function renderCashback() {
   const m = month();
-  const sumMonth = cbs.filter((c) => c.date.startsWith(m)).reduce((s, c) => s + c.amount, 0);
-  const sumAll = cbs.reduce((s, c) => s + c.amount, 0);
+  const txCashback=txs.filter(t=>t.type==='expense'&&t.cashback&&t.date.startsWith(m)).reduce((s,t)=>s+(+t.cashback.amount||0),0);
+  const sumMonth = cbs.filter((c) => c.date.startsWith(m)).reduce((s, c) => s + c.amount, 0)+txCashback;
+  const sumAll = cbs.reduce((s, c) => s + c.amount, 0)+txs.reduce((s,t)=>s+(+t.cashback?.amount||0),0);
   $('cb-month').textContent = fmt.format(sumMonth);
   $('cb-total').textContent = 'Всего: ' + fmt.format(sumAll);
   $('cb-categories').innerHTML=cashbackCats.map(c=>`<button class="cb-chip ${cbFilter===c.name?'on':''}" data-cat="${esc(c.name)}"><span>${esc(c.icon)}</span>${esc(c.name)}</button>`).join('');
   $('cb-categories').onclick=e=>{const b=e.target.closest('[data-cat]');if(b){cbFilter=b.dataset.cat;cbMode='categories';document.querySelectorAll('[data-cb-view]').forEach(x=>x.classList.toggle('on',x.dataset.cbView==='categories'));renderCashback();}};
   $('cb-categories').hidden=cbMode!=='categories';
+  $('add-cb-offer').hidden=cbMode!=='offers';
   $('cb-section-name').textContent=cbMode==='offers'?'Специальные акции':cbMode==='banks'?'Все банки':cbFilter;
   let shown=cards;
-  if(cbMode==='categories'&&cbFilter!=='Всё')shown=cards.filter(c=>(c.slots||[]).some(s=>s.cat===cbFilter));
+  if(cbMode==='categories')shown=cards.filter(c=>(c.slots||[]).some(s=>(+s.pct||0)>0&&(cbFilter==='Всё'||s.cat===cbFilter)));
   $('cb-count').textContent=cbMode==='banks'?cards.reduce((s,c)=>s+(c.slots||[]).length,0):shown.length;
   $('card-list').className=`cb-list ${cbMode}`;
-  if(cbMode==='offers'){$('card-list').innerHTML='<div class="cb-empty">Специальных акций пока нет</div>';return;}
+  if(cbMode==='offers'){
+    $('cb-count').textContent=cbOffers.filter(o=>!o.date||o.date>=todayISO()).length;
+    $('card-list').innerHTML=cbOffers.length?cbOffers.map(o=>{const b=cards.find(c=>c.id===o.bank);return `<article class="cb-offer"><div class="cb-bank-head"><span class="cb-logo" style="--brand:${esc(b?.logo?.color||'#806f54')}">${esc(b?.logo?.mark||'Б')}</span><strong>${esc(o.name)}</strong><button class="cb-offer-del" data-offer="${o.id}" aria-label="Удалить акцию">×</button></div><div class="cb-offer-meta">${esc(b?.name||'Банк')} · ${o.pct}% · максимум ${money(o.maxCashback)} кэшбэка</div><div class="cb-offer-order">Максимальный заказ: <b>${money(o.maxOrder)}</b></div><div class="cb-offer-meta">${o.date?`До ${formatDate(o.date)}`:'Без срока'}</div></article>`}).join(''):'<div class="cb-empty">Специальных акций пока нет</div>';
+    $('card-list').onclick=e=>{const b=e.target.closest('[data-offer]');if(b&&confirm('Удалить акцию?')){cbOffers=cbOffers.filter(o=>o.id!==+b.dataset.offer);save();renderCashback();}};
+    return;
+  }
   $('card-list').innerHTML=shown.map(c=>{
     const slots=c.slots||[{cat:c.cat||'Всё',pct:c.pct||0}];
     const relevant=cbMode==='categories'&&cbFilter!=='Всё'?slots.filter(s=>s.cat===cbFilter):slots;
     const best=relevant.reduce((m,s)=>Math.max(m,+s.pct||0),0);
     const logo=`<span class="cb-logo" style="--brand:${esc(c.logo?.color||'#53627b')}">${esc(c.logo?.mark||c.name.slice(0,2))}</span>`;
-    return cbMode==='banks'?`<article class="cb-bank"><div class="cb-bank-head">${logo}<strong>${esc(c.name)}</strong><button class="cb-add-slot" data-bank="${c.id}" aria-label="Добавить слот">＋</button></div><div class="cb-slots">${slots.map((s,i)=>`<button class="cb-slot" data-bank="${c.id}" data-slot="${i}"><span>${esc(s.cat||'Выбрать категорию')}</span><b>${s.pct||0}%</b></button>`).join('')}</div></article>`:`<button class="cb-bank-row" data-bank="${c.id}">${logo}<strong>${esc(c.name)}</strong><b class="cb-rate">${best}%</b></button>`;
+    if(cbMode==='banks'){
+      const used=cashbackUsed(c),limit=c.monthlyLimit,progress=limit?Math.min(100,used/limit*100):0;
+      return `<article class="cb-bank"><div class="cb-bank-head">${logo}<strong>${esc(c.name)}</strong><button class="cb-add-slot" data-bank="${c.id}" aria-label="Добавить слот">＋</button></div>${limit?`<div class="cb-limit"><div class="cb-limit-label"><span>Лимит за месяц</span><b>${money(Math.max(0,limit-used))} осталось · ${money(limit)}</b></div><div class="cb-limit-track"><i style="width:${progress}%"></i></div></div>`:`<div class="cb-limit-label">Месячный лимит не задан</div>`}<div class="cb-slots">${slots.map((s,i)=>`<button class="cb-slot" data-bank="${c.id}" data-slot="${i}"><span>${esc(s.cat||'Выбрать категорию')}${s.condition?` · ${esc(s.condition)}`:''}</span><b>${s.pct||0}%</b></button>`).join('')}</div></article>`;
+    }
+    return `<button class="cb-bank-row" data-bank="${c.id}">${logo}<strong>${esc(c.name)}</strong><b class="cb-rate">${best}%</b></button>`;
   }).join('')||'<div class="cb-empty">Пока нет банков с этой категорией</div>';
-  $('card-list').onclick=e=>{const b=e.target.closest('[data-bank]');if(!b)return;const c=cards.find(x=>x.id===+b.dataset.bank);if(!c)return;if(b.dataset.slot!=null){cbSlotIndex=+b.dataset.slot;editingCard=c.id;openModal('card');$('card-form').querySelector('.h2').textContent=`Слот ${cbSlotIndex+1} · ${c.name}`;$('cb-card-cat').value=c.slots[cbSlotIndex].cat;$('cb-card-pct').value=c.slots[cbSlotIndex].pct;return;}if(cbMode==='banks'){cbSlotIndex=null;editingCard=c.id;openModal('card');$('card-form').querySelector('.h2').textContent=`Новый слот · ${c.name}`;return;}cbFilter='Всё';cbMode='banks';document.querySelector('[data-cb-view="banks"]').click();};
+  $('card-list').onclick=e=>{const b=e.target.closest('[data-bank]');if(!b)return;const c=cards.find(x=>x.id===+b.dataset.bank);if(!c)return;if(b.dataset.slot!=null){cbSlotIndex=+b.dataset.slot;editingCard=c.id;openModal('card');$('card-form').querySelector('.h2').textContent=`Слот ${cbSlotIndex+1} · ${c.name}`;$('cb-card-cat').value=c.slots[cbSlotIndex].cat;$('cb-card-pct').value=c.slots[cbSlotIndex].pct;$('cb-card-condition').value=c.slots[cbSlotIndex].condition||'';return;}if(cbMode==='banks'){cbSlotIndex=null;editingCard=c.id;openModal('card');$('card-form').querySelector('.h2').textContent=`Новый слот · ${c.name}`;return;}cbFilter='Всё';cbMode='banks';document.querySelector('[data-cb-view="banks"]').click();};
 }
 
 // ---------- Рендер: КАТЕГОРИИ и АВТОПЛАТЕЖИ ----------
@@ -1065,12 +1138,9 @@ $('add-pay').onclick = () => openModal('pay');
 $('add-acc').onclick = () => openModal('acc');
 $('add-card').onclick = () => openModal('card');
 $('add-cb-cat').onclick = () => {
-  const name=prompt('Название новой категории кэшбэка');
-  if(!name||!name.trim())return;
-  const icon=prompt('Эмодзи или значок для категории','✨')||'✨';
-  cashbackCats.push({name:name.trim(),icon:icon.trim()||'✨'});
-  save();fillCbCards();renderCashback();
+  $('cbcat-name').value='';$('cbcat-icon').value='✨';openModal('cbcat');
 };
+$('add-cb-offer').onclick=()=>openModal('cb-offer');
 $('add-cb').onclick = () => {
   if (!cards.length) { alert('Сначала добавь карту'); return; }
   openModal('cb');
