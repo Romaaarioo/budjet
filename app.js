@@ -76,10 +76,19 @@ let cats = load('fin_categories') || {    // категории
   ],
 };
 
+// Новые базовые категории добавляются без удаления пользовательских и старых записей.
+const DEFAULT_CATS = {
+  income: [['Подработка','🧑‍💻'],['Кэшбэк','💸'],['Зарплата','💼'],['Премия','🏆'],['% по НС','🏦'],['Донорство','🩸'],['Другое','✨'],['Подарки','🎁'],['Рефералки','🤝'],['Акции','📈']],
+  expense: [['Продукты','🛒'],['Дом','🏠'],['Проезд','🚌'],['Подарки','🎁'],['Вещи','🛍️'],['Аптека','💊'],['Домашний интернет','📶'],['Другое','✨'],['Забота о себе','🧖'],['Здоровье','❤️'],['Кафе и рестики','🍽️'],['Квартира','🏢'],['Комиссии','🧾'],['Коммуналка','💡'],['Кредит','🏦'],['Кредитки','💳'],['Налоги','📑'],['Образование','🎓'],['Одежда','👕'],['Отдых и развлечения','🎭'],['Подписки','🔁'],['Путешествия','✈️'],['Связь','📱'],['Содержанке','💝'],['Спорт','🏋️'],['Такси','🚕'],['Техника','💻'],['Фастфуд','🍔']],
+};
+const ICON_EMOJI = { food:'🍽️',cart:'🛒',bus:'🚌',home:'🏠',play:'🎬',heart:'❤️',refresh:'🔁',box:'📦',case:'💼',laptop:'💻',gift:'🎁',sparkle:'✨',shirt:'👕',plane:'✈️',cap:'🎓',paw:'🐾',cash:'💵',card:'💳',bank:'🏦',coins:'🪙',trend:'📈',gem:'💎' };
 // Миграция: старые эмодзи-иконки → ключи SVG
 const E2K = { '🍔':'food','🛒':'cart','🚌':'bus','🏠':'home','🎬':'play','💊':'heart','👕':'shirt','✈️':'plane','🎓':'cap','🐾':'paw','💼':'case','💻':'laptop','🎁':'gift','✨':'sparkle','📦':'box','💳':'card','🔄':'refresh','💵':'cash','🏦':'bank','🪙':'coins','📈':'trend','💎':'gem' };
 let migrated = false;
 [...cats.expense, ...cats.income, ...accounts].forEach((c) => { if (E2K[c.icon]) { c.icon = E2K[c.icon]; migrated = true; } });
+Object.entries(DEFAULT_CATS).forEach(([type, list]) => list.forEach(([name, icon]) => {
+  if (!cats[type].some((c) => c.name === name)) { cats[type].push({ name, icon }); migrated = true; }
+}));
 
 // Счета: при первом запуске создаём два счёта и привязываем к первому все операции без счёта
 if (!accounts.length) {
@@ -126,27 +135,33 @@ function bindSwipe(el, actions, onTap) {
     actions[+b.dataset.i].cb();
   }));
 
-  let x0 = null, y0 = 0;
+  let x0 = null, y0 = 0, swiping = false;
   el.addEventListener('touchstart', (e) => {
     if (openSwipe && openSwipe !== el) closeSwipe(openSwipe);
     x0 = e.touches[0].clientX;
     y0 = e.touches[0].clientY;
-    content.style.transition = 'none';
+    swiping = false;
   }, { passive: true });
   el.addEventListener('touchmove', (e) => {
     if (x0 === null) return;
     const dx = e.touches[0].clientX - x0, dy = e.touches[0].clientY - y0;
-    if (Math.abs(dy) > Math.abs(dx)) return; // вертикальный скролл не двигает строку
+    if (!swiping && Math.max(Math.abs(dx), Math.abs(dy)) < 10) return;
+    if (!swiping && Math.abs(dy) >= Math.abs(dx)) { x0 = null; return; }
+    swiping = true;
+    content.style.transition = 'none';
     content.style.transform = `translateX(${Math.max((el.dataset.open ? -w : 0) + dx, -w)}px)`;
   }, { passive: true });
   el.addEventListener('touchend', () => {
     if (x0 === null) return;
+    if (!swiping) { x0 = null; return; }
     content.style.transition = '';
     const cur = parseFloat(content.style.transform.match(/-?[\d.]+/)) || 0;
     if (cur < -w / 2) { el.dataset.open = '1'; content.style.transform = `translateX(${-w}px)`; openSwipe = el; }
     else closeSwipe(el);
     x0 = null;
+    swiping = false;
   });
+  el.addEventListener('touchcancel', () => { content.style.transition = ''; closeSwipe(el); x0 = null; swiping = false; });
   content.onclick = () => { if (el.dataset.open) { closeSwipe(el); return; } if (onTap) onTap(); };
 }
 
@@ -168,7 +183,7 @@ themeBox.onchange = () => {
   const t = themeBox.checked ? 'dark' : 'light';
   document.documentElement.dataset.theme = t;
   localStorage.setItem('fin_theme', t);
-  document.querySelector('meta[name=theme-color]').content = t === 'light' ? '#f2f2f7' : '#000000';
+  document.querySelector('meta[name=theme-color]').content = t === 'light' ? '#f2f2f7' : '#151613';
 };
 
 const glassBox = $('glass-toggle');
@@ -216,7 +231,7 @@ function runPays() {
   let changed = false;
   for (const p of pays) {
     if (p.lastRun !== m && d >= p.day) {
-      txs.push({ id: Date.now() + Math.random(), type: 'expense', amount: p.amount, category: 'Автоплатёж', note: p.name, date: todayISO(), account: accounts[0] && accounts[0].id });
+      txs.push({ id: Date.now() + Math.random(), type: 'expense', amount: p.amount, category: 'Автоплатёж', note: p.name, date: todayISO(), account: p.account || (accounts[0] && accounts[0].id) });
       p.lastRun = m;
       changed = true;
     }
@@ -231,6 +246,9 @@ let editingTx = null;    // id редактируемой операции
 let editingAcc = null;   // id редактируемого счёта
 let editingCard = null;  // id редактируемой карты
 let editingBudget = null; // категория редактируемого лимита
+let editingGoal = null;
+let editingPay = null;
+let editingCat = null;
 
 function openModal(kind) {
   ['tx', 'inv', 'cat', 'pay', 'acc', 'card', 'cb', 'budget', 'goal'].forEach((k) => ($(`${k}-form`).hidden = k !== kind));
@@ -242,10 +260,20 @@ function openModal(kind) {
     $('tx-date').value = todayISO(); fillCat(); fillAcc(); syncTxForm();
     $('tx-repeat').hidden = !txs.length;
   }
-  if (kind === 'cat') { setSeg($('cat-form'), 'expense'); pickEmoji($('cat-form'), 'sparkle'); $('cat-emoji').value = ''; }
+  if (kind === 'cat' && !editingCat) {
+    $('cat-form').querySelector('.h2').textContent = 'Новая категория';
+    $('cat-type').hidden = false;
+    $('cat-name').value = '';
+    setSeg($('cat-form'), 'expense'); pickEmoji($('cat-form'), 'sparkle'); $('cat-emoji').value = '';
+  }
+  if (kind === 'goal' && !editingGoal) $('goal-form').querySelector('.h2').textContent = 'Цель накоплений';
   if (kind === 'acc') { pickEmoji($('acc-form'), 'cash'); $('acc-emoji').value = ''; }
   if (kind === 'cb') { $('cb-date').value = todayISO(); fillCbCards(); }
   if (kind === 'card') fillCbCards();
+  if (kind === 'pay') {
+    $('pay-account').innerHTML = accounts.map((a) => `<option value="${a.id}">${esc(a.name)}</option>`).join('');
+    if (!editingPay) $('pay-account').value = accounts[0] ? accounts[0].id : '';
+  }
   if (kind === 'budget') {
     $('budget-title').textContent = 'Лимит: ' + editingBudget;
     $('budget-limit').value = budgets[editingBudget] || '';
@@ -261,6 +289,9 @@ function closeModal() {
   editingAcc = null;
   editingCard = null;
   editingBudget = null;
+  editingGoal = null;
+  editingPay = null;
+  editingCat = null;
 }
 $('fab').onclick = () => openModal('tx');
 modal.onclick = (e) => { if (e.target === modal) closeModal(); };
@@ -340,13 +371,13 @@ function syncTxForm() {
 }
 function fillCbCards() {
   $('cb-card').innerHTML = cards.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
-  $('cb-card-cat').innerHTML = cats.expense.map((c) => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('');
+  $('cb-card-cat').innerHTML = cats.expense.map((c) => `<option value="${esc(c.name)}">${esc(ICON_EMOJI[c.icon] || (ICONS[c.icon] ? '🏷️' : c.icon))} ${esc(c.name)}</option>`).join('');
 }
 
 // Выбор иконки (для категорий и счетов)
-const CAT_EMOJIS = ['food','cart','bus','home','play','heart','shirt','plane','cap','paw','case','laptop','gift','sparkle','box','card'];
+const CAT_EMOJIS = ['food','cart','bus','home','play','heart','shirt','plane','cap','paw','case','laptop','gift','sparkle','box','card','🍎','🥑','🥩','🥐','🍔','🍕','🍜','☕','🍰','🧋','🚕','🚇','🚲','⛽','🛞','🧹','🛋️','🪴','🔧','🧻','🧴','💊','🩺','🧘','🏋️','⚽','🎮','🎟️','🎨','📚','🎧','📱','⌚','📺','📶','🔌','🧳','🏖️','🏨','🌿','🐶','🐱','👶','💐','💸','🧾','💡','🔑','🧺','🛍️','💝','🤝','🩸','🏆','📑'];
 const ACC_EMOJIS = ['cash','card','bank','coins','trend','gem'];
-const renderEmojiRow = (el, list) => (el.innerHTML = list.map((k) => `<button type="button" data-k="${k}">${svgIcon(k)}</button>`).join(''));
+const renderEmojiRow = (el, list) => (el.innerHTML = list.map((k) => `<button type="button" data-k="${esc(k)}">${renderIcon(k)}</button>`).join(''));
 renderEmojiRow($('emoji-row'), CAT_EMOJIS);
 renderEmojiRow($('acc-emoji-row'), ACC_EMOJIS);
 
@@ -395,7 +426,19 @@ $('inv-form').onsubmit = (e) => {
 
 $('cat-form').onsubmit = (e) => {
   e.preventDefault();
-  cats[$('cat-form').dataset.type].push({ icon: $('cat-form').dataset.icon, name: $('cat-name').value.trim() });
+  const type = editingCat ? editingCat.type : $('cat-form').dataset.type;
+  const oldName = editingCat && editingCat.name;
+  const name = $('cat-name').value.trim();
+  if (cats[type].some((c) => c.name === name && c.name !== oldName)) { alert('Такая категория уже есть'); return; }
+  if (editingCat) {
+    const c = cats[type].find((x) => x.name === oldName);
+    if (c) { c.name = name; c.icon = $('cat-form').dataset.icon; }
+    if (name !== oldName) txs.forEach((t) => { if (t.type === type && t.category === oldName) t.category = name; });
+    if (type === 'expense' && name !== oldName) {
+      if (budgets[oldName] != null) { budgets[name] = budgets[oldName]; delete budgets[oldName]; }
+      cards.forEach((c) => { if (c.cat === oldName) c.cat = name; });
+    }
+  } else cats[type].push({ icon: $('cat-form').dataset.icon, name });
   save(); renderAll(); closeModal();
 };
 
@@ -433,7 +476,16 @@ $('budget-remove').onclick = () => {
 };
 $('goal-form').onsubmit = (e) => {
   e.preventDefault();
-  goals.push({id:Date.now(),name:$('goal-name').value.trim(),target:+$('goal-target').value,saved:+$('goal-saved').value,date:$('goal-date').value});
+  const d = {name:$('goal-name').value.trim(),target:+$('goal-target').value,saved:+$('goal-saved').value,date:$('goal-date').value};
+  if (editingGoal) Object.assign(goals.find((g) => g.id === editingGoal), d);
+  else goals.push({id:Date.now(),...d});
+  save(); renderAll(); closeModal();
+};
+$('pay-form').onsubmit = (e) => {
+  e.preventDefault();
+  const d = {name:$('pay-name').value.trim(),amount:+$('pay-amount').value,day:+$('pay-day').value,account:+$('pay-account').value};
+  if (editingPay) Object.assign(pays.find((p) => p.id == editingPay), d);
+  else pays.push({id:Date.now(),...d});
   save(); renderAll(); closeModal();
 };
 
@@ -477,6 +529,36 @@ function editCard(id) {
   $('cb-card-pct').value = c.pct;
 }
 
+function editGoal(id) {
+  const g = goals.find((x) => x.id === id);
+  if (!g) return;
+  editingGoal = g.id;
+  openModal('goal');
+  $('goal-form').querySelector('.h2').textContent = 'Редактировать цель';
+  $('goal-name').value = g.name; $('goal-target').value = g.target;
+  $('goal-saved').value = g.saved; $('goal-date').value = g.date || '';
+}
+
+function editPay(id) {
+  const p = pays.find((x) => x.id == id);
+  if (!p) return;
+  editingPay = p.id;
+  openModal('pay');
+  $('pay-name').value = p.name; $('pay-amount').value = p.amount;
+  $('pay-day').value = p.day; $('pay-account').value = p.account || (accounts[0] && accounts[0].id);
+}
+
+function editCat(type, name) {
+  const c = cats[type].find((x) => x.name === name);
+  if (!c) return;
+  editingCat = {type, name};
+  openModal('cat');
+  $('cat-form').querySelector('.h2').textContent = 'Редактировать категорию';
+  $('cat-type').hidden = true;
+  $('cat-name').value = c.name; $('cat-emoji').value = ICONS[c.icon] ? '' : c.icon;
+  pickEmoji($('cat-form'), c.icon);
+}
+
 // ---------- Рендер: СЧЕТА ----------
 function renderOverview() {
   $('total-balance').textContent = fmt.format(
@@ -497,12 +579,20 @@ function renderOverview() {
           <div class="ic">${renderIcon(a.icon)}</div>
           <div class="grow"><div class="name">${esc(a.name)}</div><div class="note">Баланс счёта</div></div>
           <div class="amt ${b >= 0 ? 'in' : 'out'}">${fmt.format(b)}</div>
+          <span class="order-controls"><button type="button" data-move="-1" aria-label="Переместить ${esc(a.name)} выше" ${accounts.indexOf(a) === 0 ? 'disabled' : ''}>↑</button><button type="button" data-move="1" aria-label="Переместить ${esc(a.name)} ниже" ${accounts.indexOf(a) === accounts.length - 1 ? 'disabled' : ''}>↓</button></span>
         </div>
       </div>`;
   }).join('') || '<div class="empty">Счетов нет</div>';
 
   $('account-list').querySelectorAll('.swipe').forEach((el) => {
     const aid = +el.querySelector('.li').dataset.id;
+    el.querySelectorAll('[data-move]').forEach((b) => (b.onclick = (e) => {
+      e.stopPropagation();
+      const i = accounts.findIndex((a) => a.id === aid), j = i + +b.dataset.move;
+      if (j < 0 || j >= accounts.length) return;
+      [accounts[i], accounts[j]] = [accounts[j], accounts[i]];
+      save(); renderOverview();
+    }));
     bindSwipe(el, [
       { icon: 'pencil', cls: 'sw-edit', cb: () => editAcc(aid) },
       { icon: 'trash', cls: 'sw-del', cb: () => deleteAccount(aid) },
@@ -517,6 +607,7 @@ function deleteAccount(id) {
     const other = accounts.find((x) => x.id !== id).id;
     txs = txs.filter((t) => t.type !== 'transfer' || (t.from !== id && t.to !== id));
     txs.forEach((t) => { if (t.account === id) t.account = other; });
+    pays.forEach((p) => { if (p.account == id) p.account = other; });
     accounts = accounts.filter((x) => x.id !== id);
     save(); renderAll();
   }
@@ -677,7 +768,18 @@ function renderTrend() {
 }
 
 function renderGoals() {
-  $('goal-list').innerHTML=goals.length?goals.map(g=>`<div class="card goal"><b>${esc(g.name)}</b><span>${fmt.format(g.saved)} / ${fmt.format(g.target)}</span><div class="track"><i style="width:${Math.min(100,g.saved/g.target*100)}%"></i></div><small>${g.date?`К ${g.date}`:`Осталось ${fmt.format(Math.max(0,g.target-g.saved))}`}</small></div>`).join(''):'<div class="empty">Пока нет целей</div>';
+  $('goal-list').innerHTML = goals.length ? goals.map((g) => `
+    <div class="swipe goal-swipe">
+      <div class="swipe-actions"></div>
+      <div class="card goal" data-id="${g.id}"><b>${esc(g.name)}</b><span>${fmt.format(g.saved)} / ${fmt.format(g.target)}</span><div class="track"><i style="width:${Math.min(100,g.saved/g.target*100)}%"></i></div><small>${g.date ? `К ${formatDate(g.date)}` : `Осталось ${fmt.format(Math.max(0,g.target-g.saved))}`}</small></div>
+    </div>`).join('') : '<div class="empty">Пока нет целей</div>';
+  $('goal-list').querySelectorAll('.swipe').forEach((el) => {
+    const id = +el.querySelector('.goal').dataset.id;
+    bindSwipe(el, [
+      {icon:'pencil',cls:'sw-edit',cb:()=>editGoal(id)},
+      {icon:'trash',cls:'sw-del',cb:()=>{const g=goals.find(x=>x.id===id);if(confirm(`Удалить цель «${g.name}»?`)){goals=goals.filter(x=>x.id!==id);save();renderAll();}}},
+    ],()=>editGoal(id));
+  });
 }
 
 // ---------- Рендер: ОПЕРАЦИИ ----------
@@ -820,7 +922,7 @@ function renderCats() {
   const row = (c, t) => `
     <div class="swipe">
       <div class="swipe-actions"></div>
-      <div class="li" data-n="${esc(c.name)}">
+      <div class="li" data-n="${esc(c.name)}" data-t="${t}">
         <div class="ic">${renderIcon(c.icon)}</div><div class="grow name">${esc(c.name)}</div>
       </div>
     </div>`;
@@ -828,34 +930,41 @@ function renderCats() {
     '<div class="sec">Расходы</div>' + cats.expense.map((c) => row(c, 'expense')).join('') +
     '<div class="sec">Доходы</div>' + cats.income.map((c) => row(c, 'income')).join('');
   $('cat-list').querySelectorAll('.swipe').forEach((el) => {
-    const name = el.querySelector('.li').dataset.n;
+    const li = el.querySelector('.li'), name = li.dataset.n, type = li.dataset.t;
     bindSwipe(el, [
+      { icon: 'pencil', cls: 'sw-edit', cb: () => editCat(type, name) },
       { icon: 'trash', cls: 'sw-del', cb: () => {
-        cats.expense = cats.expense.filter((c) => c.name !== name);
-        cats.income = cats.income.filter((c) => c.name !== name);
-        delete budgets[name];
+        if (!confirm(`Удалить категорию «${name}»? История операций сохранится.`)) return;
+        cats[type] = cats[type].filter((c) => c.name !== name);
+        if (type === 'expense') {
+          delete budgets[name];
+          const fallback = cats.expense.find((c) => c.name === 'Другое');
+          if (fallback) cards.forEach((c) => { if (c.cat === name) c.cat = fallback.name; });
+        }
         save(); renderAll();
       } },
-    ]);
+    ], () => editCat(type, name));
   });
 }
 
 function renderPays() {
   const now=new Date(), next=p=>{let d=new Date(now.getFullYear(),now.getMonth(),Math.min(p.day,new Date(now.getFullYear(),now.getMonth()+1,0).getDate()));if(d<new Date(now.getFullYear(),now.getMonth(),now.getDate()))d=new Date(now.getFullYear(),now.getMonth()+1,Math.min(p.day,new Date(now.getFullYear(),now.getMonth()+2,0).getDate()));return d};
+  const accName = (id) => (accounts.find((a) => a.id === +id) || {}).name || (accounts[0] || {}).name || 'Счёт не выбран';
   const upcoming=pays.reduce((s,p)=>s+p.amount,0);
   $('autopay-list').innerHTML = (pays.length?`<div class="sec">В месяц: ${fmt.format(upcoming)}</div>`:'')+(pays.length ? [...pays].sort((a,b)=>next(a)-next(b)).map((p) => `
     <div class="swipe">
       <div class="swipe-actions"></div>
       <div class="li" data-id="${p.id}">
         <div class="ic">${svgIcon('refresh')}</div>
-        <div class="grow"><div class="name">${esc(p.name)}</div><div class="note">${formatDate(next(p).toISOString().slice(0,10))} · ${fmt.format(p.amount)}</div></div>
+        <div class="grow"><div class="name">${esc(p.name)}</div><div class="note">${formatDate(next(p).toISOString().slice(0,10))} · ${fmt.format(p.amount)} · ${esc(accName(p.account))}</div></div>
       </div>
     </div>`).join('') : '<div class="empty">Автоплатежей нет. Нажми «Добавить», чтобы настроить</div>');
   $('autopay-list').querySelectorAll('.swipe').forEach((el) => {
     const pid = el.querySelector('.li').dataset.id;
     bindSwipe(el, [
+      { icon: 'pencil', cls: 'sw-edit', cb: () => editPay(pid) },
       { icon: 'trash', cls: 'sw-del', cb: () => { if (confirm('Удалить автоплатёж?')) { pays = pays.filter((p) => p.id != pid); save(); renderAll(); } } },
-    ]);
+    ], () => editPay(pid));
   });
 }
 
