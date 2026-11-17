@@ -382,6 +382,51 @@ body::before, body::after { display: none !important; animation: none !important
 .bank-logo svg { display:block; width:100%; height:100%; fill:var(--brand); }
 .bank-logo text { fill:#fff; font:700 12px Arial,sans-serif; }
 .slot-add { border:0; background:var(--field); color:var(--acc); border-radius:10px; width:34px; height:34px; font-size:20px; }
+#view-cashback.cashback-app { max-width:1200px; min-height:calc(100vh - 96px); padding:0 0 30px; color:#f4f7ff; background:#030919; }
+.cb-top { min-height:72px; display:flex; align-items:center; justify-content:space-between; gap:20px; border-bottom:1px solid #263149; }
+.cb-brand { display:flex; align-items:center; gap:11px; white-space:nowrap; font-size:18px; }
+.cb-mark { display:grid; place-items:center; width:36px; height:36px; border-radius:50%; color:#071022; background:#f4f7ff; font-weight:800; font-size:21px; }
+.cb-tabs { display:flex; padding:5px; border:1px solid #263149; border-radius:30px; background:#192338; }
+.cb-tabs button { border:0; border-radius:24px; padding:9px 15px; color:#9aa9c2; background:transparent; font:inherit; font-size:15px; font-weight:600; white-space:nowrap; }
+.cb-tabs button.on { color:#f7f9ff; background:#030919; }
+.cb-actions { display:flex; flex-direction:column; align-items:flex-end; gap:14px; padding:20px 0 14px; border-bottom:1px solid #263149; }
+.cb-purchase { border:0; border-radius:14px; padding:11px 17px; color:#061021; background:#f5f7fb; font:inherit; font-size:15px; font-weight:600; }
+.cb-chips { display:flex; align-self:stretch; gap:8px; overflow-x:auto; scrollbar-width:none; padding-bottom:1px; }
+.cb-chips::-webkit-scrollbar { display:none; }
+.cb-chip { display:flex; align-items:center; gap:8px; flex:none; border:1px solid #293650; border-radius:24px; padding:9px 14px; color:#a5b2c8; background:transparent; font:inherit; font-size:14px; font-weight:500; }
+.cb-chip.on { color:#071022; background:#f5f7fb; border-color:#f5f7fb; }
+.cb-summary { display:flex; justify-content:space-between; gap:12px; padding:16px 2px 8px; color:#99a9c2; font-size:13px; }
+.cb-summary b { color:#f5f7fb; margin-left:8px; }
+.cb-section-title { display:flex; align-items:center; gap:10px; margin:16px 0 10px; font-size:18px; }
+.cb-section-icon { display:grid; place-items:center; width:40px; height:40px; border-radius:13px; background:#1e2b43; }
+.cb-count { padding:3px 9px; border-radius:18px; color:#bbcae1; background:#1e2b43; font-size:13px; }
+.cb-list { overflow:hidden; border:1px solid #263149; border-radius:20px; }
+.cb-bank-row { display:flex; align-items:center; gap:14px; width:100%; min-height:60px; padding:9px 19px; border:0; border-bottom:1px solid #263149; color:#f2f6ff; background:transparent; text-align:left; font:inherit; font-size:16px; font-weight:600; }
+.cb-bank-row:last-child { border-bottom:0; }
+.cb-bank-row strong { flex:1; }
+.cb-logo { display:grid; place-items:center; flex:none; width:36px; height:36px; border-radius:50%; color:white; background:var(--brand); font-size:13px; font-weight:800; }
+.cb-rate { padding:6px 13px; border-radius:20px; color:#071022; background:#f5f7fb; font-size:15px; }
+.cb-bank { padding:12px 16px; border-bottom:1px solid #263149; }
+.cb-bank:last-child { border-bottom:0; }
+.cb-bank-head { display:flex; align-items:center; gap:12px; min-height:42px; }
+.cb-bank-head strong { flex:1; }
+.cb-add-slot { border:1px solid #34425a; border-radius:11px; width:36px; height:34px; color:#d9e4f4; background:#162138; font-size:21px; }
+.cb-slots { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; margin:10px 0 0 48px; }
+.cb-slot { display:flex; justify-content:space-between; align-items:center; gap:8px; min-width:0; border:1px solid #263149; border-radius:10px; padding:8px 10px; color:#aab8ce; background:#0a1223; font:inherit; font-size:13px; text-align:left; }
+.cb-slot span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cb-slot b { color:#fff; white-space:nowrap; }
+.cb-empty { padding:30px 16px; color:#9aa9c2; text-align:center; }
+.cb-footer { display:flex; gap:20px; padding:16px 2px; }
+.cb-text-btn { border:0; padding:4px 0; color:#aebdd3; background:none; font:inherit; font-size:14px; font-weight:500; }
+@media(max-width:640px) {
+  #view-cashback.cashback-app { padding:0 0 24px; }
+  .cb-top { align-items:flex-start; flex-direction:column; gap:12px; padding:12px 0; }
+  .cb-tabs { width:100%; justify-content:space-between; }
+  .cb-tabs button { padding:8px 10px; font-size:13px; }
+  .cb-actions { padding-top:14px; }
+  .cb-chip { padding:8px 12px; font-size:13px; }
+  .cb-slots { grid-template-columns:1fr; margin-left:0; }
+}
 button, .card, .li, .seg-btn, .tab, .switch i { -webkit-tap-highlight-color: transparent; }
 
 @media (prefers-reduced-motion: reduce) {

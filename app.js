@@ -323,6 +323,7 @@ function closeModal() {
   editingGoal = null;
   editingPay = null;
   editingCat = null;
+  cbSlotIndex = null;
 }
 $('fab').onclick = () => openModal('tx');
 modal.onclick = (e) => { if (e.target === modal) closeModal(); };
@@ -495,8 +496,10 @@ $('card-form').onsubmit = (e) => {
   e.preventDefault();
   if (editingCard) {
     const c=cards.find(x=>x.id===editingCard);
-    c.slots.push({cat:$('cb-card-cat').value,pct:+$('cb-card-pct').value});
+    const slot={cat:$('cb-card-cat').value,pct:+$('cb-card-pct').value};
+    if(cbSlotIndex==null)c.slots.push(slot);else c.slots[cbSlotIndex]=slot;
   } else cards.push({id:Date.now(),name:$('cb-card-name').value.trim(),logo:{color:'#8b7049',mark:$('cb-card-name').value.trim().slice(0,2).toUpperCase()},cat:$('cb-card-cat').value,pct:+$('cb-card-pct').value,slots:[{cat:$('cb-card-cat').value,pct:+$('cb-card-pct').value}]});
+  cbSlotIndex=null;
   save(); renderAll(); closeModal();
 };
 
@@ -972,31 +975,36 @@ function renderInvestments() {
 }
 
 // ---------- Рендер: КЭШБЭК ----------
+let cbMode='categories', cbFilter='Всё', cbSlotIndex=null;
+document.querySelectorAll('[data-cb-view]').forEach(b=>b.onclick=()=>{
+  cbMode=b.dataset.cbView;
+  document.querySelectorAll('[data-cb-view]').forEach(x=>x.classList.toggle('on',x===b));
+  renderCashback();
+});
 function renderCashback() {
   const m = month();
   const sumMonth = cbs.filter((c) => c.date.startsWith(m)).reduce((s, c) => s + c.amount, 0);
   const sumAll = cbs.reduce((s, c) => s + c.amount, 0);
   $('cb-month').textContent = fmt.format(sumMonth);
   $('cb-total').textContent = 'Всего: ' + fmt.format(sumAll);
-
-  $('card-list').innerHTML = cards.length ? cards.map((c) => `
-    <div class="swipe">
-      <div class="swipe-actions"></div>
-      <div class="li tap" data-id="${c.id}">
-        <div class="bank-logo" style="--brand:${esc(c.logo?.color||'#806f54')}"><svg viewBox="0 0 48 48" role="img" aria-label="${esc(c.name)}"><circle cx="24" cy="24" r="23"/><text x="24" y="29" text-anchor="middle">${esc(c.logo?.mark||c.name.slice(0,2))}</text></svg></div>
-        <div class="grow"><div class="name">${esc(c.name)}</div><div class="note">${(c.slots||[{cat:c.cat,pct:c.pct}]).map((s,i)=>`${i+1}. ${esc(s.cat||'Всё')} · ${s.pct||0}%`).join('　')}</div></div>
-        <button class="slot-add" type="button" aria-label="Добавить слот">＋</button>
-      </div>
-    </div>`).join('') : '<div class="empty">Карт нет. Добавь карту и её категорию кэшбэка</div>';
-
-  $('card-list').querySelectorAll('.swipe').forEach((el) => {
-    const cid = +el.querySelector('.li').dataset.id;
-    el.querySelector('.slot-add').onclick=(e)=>{e.stopPropagation();editCard(cid);};
-    bindSwipe(el, [
-      { icon: 'pencil', cls: 'sw-edit', cb: () => editCard(cid) },
-      { icon: 'trash', cls: 'sw-del', cb: () => { if (confirm('Удалить карту из списка?')) { cards = cards.filter((c) => c.id !== cid); save(); renderAll(); } } },
-    ], () => editCard(cid));
-  });
+  $('cb-categories').innerHTML=cashbackCats.map(c=>`<button class="cb-chip ${cbFilter===c.name?'on':''}" data-cat="${esc(c.name)}"><span>${esc(c.icon)}</span>${esc(c.name)}</button>`).join('');
+  $('cb-categories').onclick=e=>{const b=e.target.closest('[data-cat]');if(b){cbFilter=b.dataset.cat;cbMode='categories';document.querySelectorAll('[data-cb-view]').forEach(x=>x.classList.toggle('on',x.dataset.cbView==='categories'));renderCashback();}};
+  $('cb-categories').hidden=cbMode!=='categories';
+  $('cb-section-name').textContent=cbMode==='offers'?'Специальные акции':cbMode==='banks'?'Все банки':cbFilter;
+  $('cb-section-icon').textContent=cbMode==='offers'?'◉':cbMode==='banks'?'▱':'▦';
+  let shown=cards;
+  if(cbMode==='categories'&&cbFilter!=='Всё')shown=cards.filter(c=>(c.slots||[]).some(s=>s.cat===cbFilter));
+  $('cb-count').textContent=cbMode==='banks'?cards.reduce((s,c)=>s+(c.slots||[]).length,0):shown.length;
+  $('card-list').className=`cb-list ${cbMode}`;
+  if(cbMode==='offers'){$('card-list').innerHTML='<div class="cb-empty">Специальных акций пока нет</div>';return;}
+  $('card-list').innerHTML=shown.map(c=>{
+    const slots=c.slots||[{cat:c.cat||'Всё',pct:c.pct||0}];
+    const relevant=cbMode==='categories'&&cbFilter!=='Всё'?slots.filter(s=>s.cat===cbFilter):slots;
+    const best=relevant.reduce((m,s)=>Math.max(m,+s.pct||0),0);
+    const logo=`<span class="cb-logo" style="--brand:${esc(c.logo?.color||'#53627b')}">${esc(c.logo?.mark||c.name.slice(0,2))}</span>`;
+    return cbMode==='banks'?`<article class="cb-bank"><div class="cb-bank-head">${logo}<strong>${esc(c.name)}</strong><button class="cb-add-slot" data-bank="${c.id}" aria-label="Добавить слот">＋</button></div><div class="cb-slots">${slots.map((s,i)=>`<button class="cb-slot" data-bank="${c.id}" data-slot="${i}"><span>${esc(s.cat||'Выбрать категорию')}</span><b>${s.pct||0}%</b></button>`).join('')}</div></article>`:`<button class="cb-bank-row" data-bank="${c.id}">${logo}<strong>${esc(c.name)}</strong><b class="cb-rate">${best}%</b></button>`;
+  }).join('')||'<div class="cb-empty">Пока нет банков с этой категорией</div>';
+  $('card-list').onclick=e=>{const b=e.target.closest('[data-bank]');if(!b)return;const c=cards.find(x=>x.id===+b.dataset.bank);if(!c)return;if(b.dataset.slot!=null){cbSlotIndex=+b.dataset.slot;editingCard=c.id;openModal('card');$('card-form').querySelector('.h2').textContent=`Слот ${cbSlotIndex+1} · ${c.name}`;$('cb-card-cat').value=c.slots[cbSlotIndex].cat;$('cb-card-pct').value=c.slots[cbSlotIndex].pct;return;}if(cbMode==='banks'){cbSlotIndex=null;editingCard=c.id;openModal('card');$('card-form').querySelector('.h2').textContent=`Новый слот · ${c.name}`;return;}cbFilter='Всё';cbMode='banks';document.querySelector('[data-cb-view="banks"]').click();};
 }
 
 // ---------- Рендер: КАТЕГОРИИ и АВТОПЛАТЕЖИ ----------
@@ -1062,7 +1070,7 @@ $('add-cb-cat').onclick = () => {
   if(!name||!name.trim())return;
   const icon=prompt('Эмодзи или значок для категории','✨')||'✨';
   cashbackCats.push({name:name.trim(),icon:icon.trim()||'✨'});
-  save();fillCbCards();
+  save();fillCbCards();renderCashback();
 };
 $('add-cb').onclick = () => {
   if (!cards.length) { alert('Сначала добавь карту'); return; }
