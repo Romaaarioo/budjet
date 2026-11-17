@@ -7,7 +7,7 @@
   <title>Мои Финансы</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="style.css?v=24">
+  <link rel="stylesheet" href="style.css?v=28">
   <script>
     // Тема и Liquid Glass применяются до отрисовки, чтобы не «мигало»
     const t = localStorage.getItem('fin_theme') || 'dark';
@@ -90,7 +90,8 @@
       <div class="lbl" id="cb-total" style="margin-top:8px">Всего: 0 ₽</div>
     </div>
     <div class="card"><div class="h2">Карты и повышенный кэшбэк</div><div id="card-list"></div></div>
-    <button class="btn primary block" id="add-card">Добавить карту</button>
+    <button class="btn primary block" id="add-card">Добавить банк</button>
+    <button class="btn ghost block" id="add-cb-cat">Добавить категорию кэшбэка</button>
     <button class="btn ghost block" id="add-cb">Отметить полученный кэшбэк</button>
   </section>
 
@@ -218,9 +219,9 @@
     </form>
 
     <form id="card-form" hidden>
-      <div class="h2">Карта</div>
-      <label>Название<input type="text" id="cb-card-name" maxlength="20" placeholder="Например: Т-Банк" required></label>
-      <label>Категория повышенного кэшбэка<select id="cb-card-cat"></select></label>
+      <div class="h2">Банк и слот кэшбэка</div>
+      <label>Название банка<input type="text" id="cb-card-name" maxlength="20" placeholder="Например: Мой банк" required></label>
+      <label>Категория кэшбэка<select id="cb-card-cat"></select></label>
       <label>Процент<input type="number" id="cb-card-pct" inputmode="decimal" min="0" max="100" step="0.5" placeholder="5" required></label>
       <div class="actions"><button type="button" class="btn ghost cancel">Отмена</button><button type="submit" class="btn primary">Сохранить</button></div>
     </form>
@@ -260,7 +261,7 @@
   </div>
 </div>
 
-<script src="app.js?v=24"></script>
+<script src="app.js?v=28"></script>
 </body>
 </html>
 

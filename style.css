@@ -378,6 +378,10 @@ body::before, body::after { display: none !important; animation: none !important
 .swipe-actions button { opacity: 1; }
 .trend i { transition: height .28s ease; }
 .currency-filter { margin: 0 0 12px; }
+.bank-logo { width:38px; height:38px; flex:0 0 38px; }
+.bank-logo svg { display:block; width:100%; height:100%; fill:var(--brand); }
+.bank-logo text { fill:#fff; font:700 12px Arial,sans-serif; }
+.slot-add { border:0; background:var(--field); color:var(--acc); border-radius:10px; width:34px; height:34px; font-size:20px; }
 button, .card, .li, .seg-btn, .tab, .switch i { -webkit-tap-highlight-color: transparent; }
 
 @media (prefers-reduced-motion: reduce) {

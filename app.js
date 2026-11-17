@@ -18,6 +18,7 @@ const save = () => {
   localStorage.setItem('fin_cashback', JSON.stringify(cbs));
   localStorage.setItem('fin_budgets', JSON.stringify(budgets));
   localStorage.setItem('fin_goals', JSON.stringify(goals));
+  localStorage.setItem('fin_cb_categories', JSON.stringify(cashbackCats));
 };
 
 // ---------- SVG-иконки (стиль Lucide) ----------
@@ -62,9 +63,23 @@ let invs = load('fin_investments', []);   // инвестиции
 let pays = load('fin_autopays', []);      // автоплатежи
 let accounts = load('fin_accounts', []);  // счета
 let cards = load('fin_cards', []);        // карты для кэшбэка
+let cashbackCats = load('fin_cb_categories', null) || ['Всё','Продукты','Аптеки','Кафе и рестораны','Фастфуд','Одежда и обувь','Транспорт','Зоотовары','ЖД','Техника','Кино','Развлечения','Спорттовары','Дом и ремонт','Такси','Цветы','Фитнес','Маркетплейсы','Авиабилеты','Красота','Мед. услуги','Путешествия'].map((name,i)=>({name,icon:['✨','🛒','💊','🍽️','🍔','👕','🚇','🐾','🚆','💻','🎬','🎭','🏋️','🛠️','🚕','💐','🧘','📦','✈️','💄','🩺','🧳'][i]}));
 let cbs = load('fin_cashback', []);       // полученный кэшбэк
 let budgets = load('fin_budgets', {});    // лимиты: категория → сумма в месяц
 let goals = load('fin_goals', []);
+const BANKS = [['Альфа',3,'#ef3124','А'],['ВТБ',4,'#00a7e1','ВТБ'],['Озон',4,'#005bff','O'],['Т-Банк',4,'#ffdd2d','Т'],['Сбер',3,'#21a038','С'],['МТС',5,'#e30611','МТС'],['Яндекс',5,'#fc3f1d','Я'],['ОТП',4,'#d71920','ОТП'],['Яндекс ПРО',6,'#fc3f1d','ЯП'],['Апельсин',3,'#ff8c00','А'],['WB',4,'#cb11ab','WB'],['БКС',4,'#172d5c','БКС']];
+let cashbackSeeded=false;
+cards.forEach(c=>{if(!c.slots)c.slots=[{cat:c.cat||'Всё',pct:c.pct||0}];});
+BANKS.forEach(([name,count,color,mark],i)=>{
+  let c=cards.find(x=>x.name.toLowerCase()===name.toLowerCase());
+  if(!c){c={id:Date.now()+i,name,cat:'Всё',pct:0,slots:[]};cards.push(c);cashbackSeeded=true;}
+  if(!c.logo){c.logo={color,mark};cashbackSeeded=true;} else c.logo={color,mark};
+  while(c.slots.length<count){c.slots.push({cat:'Всё',pct:0});cashbackSeeded=true;}
+});
+if(cashbackSeeded||!localStorage.getItem('fin_cb_categories')) {
+  localStorage.setItem('fin_cards',JSON.stringify(cards));
+  localStorage.setItem('fin_cb_categories',JSON.stringify(cashbackCats));
+}
 let cats = load('fin_categories') || {    // категории
   expense: [
     { icon: 'food', name: 'Продукты' }, { icon: 'bus', name: 'Транспорт' },
@@ -196,7 +211,7 @@ glassBox.onchange = () => {
   localStorage.setItem('fin_glass', glassBox.checked);
 };
 
-const DATA_KEYS = ['fin_transactions', 'fin_investments', 'fin_categories', 'fin_autopays', 'fin_accounts', 'fin_cards', 'fin_cashback', 'fin_budgets', 'fin_goals'];
+const DATA_KEYS = ['fin_transactions', 'fin_investments', 'fin_categories', 'fin_autopays', 'fin_accounts', 'fin_cards', 'fin_cashback', 'fin_budgets', 'fin_goals', 'fin_cb_categories'];
 $('export-data').onclick = () => {
   const data = { app: 'moi-finansy', exported: new Date().toISOString() };
   DATA_KEYS.forEach((k) => (data[k] = JSON.parse(localStorage.getItem(k) || 'null')));
@@ -223,7 +238,7 @@ $('import-file').onchange = async (e) => {
 
 $('clear-data').onclick = () => {
   if (confirm('Удалить ВСЕ данные? Действие необратимо.')) {
-    ['fin_transactions', 'fin_investments', 'fin_categories', 'fin_autopays', 'fin_accounts', 'fin_cards', 'fin_cashback', 'fin_budgets', 'fin_goals'].forEach((k) => localStorage.removeItem(k));
+    ['fin_transactions', 'fin_investments', 'fin_categories', 'fin_autopays', 'fin_accounts', 'fin_cards', 'fin_cashback', 'fin_budgets', 'fin_goals', 'fin_cb_categories'].forEach((k) => localStorage.removeItem(k));
     location.reload();
   }
 };
@@ -279,7 +294,12 @@ function openModal(kind) {
     pickEmoji($('acc-form'), 'cash'); $('acc-emoji').value = '';
   }
   if (kind === 'cb') { $('cb-date').value = todayISO(); fillCbCards(); }
-  if (kind === 'card') fillCbCards();
+  if (kind === 'card') {
+    fillCbCards();
+    $('cb-card-name').parentElement.hidden = !!editingCard;
+    $('cb-card-name').required = !editingCard;
+    if (!editingCard) $('card-form').querySelector('.h2').textContent = 'Новый банк';
+  }
   if (kind === 'pay') {
     $('pay-account').innerHTML = accounts.map((a) => `<option value="${a.id}">${esc(a.name)} · ${a.currency||'RUB'}</option>`).join('');
     if (!editingPay) $('pay-account').value = accounts[0] ? accounts[0].id : '';
@@ -386,7 +406,7 @@ $('tx-account').onchange = syncTxForm;
 $('tx-from').onchange = syncTxForm;
 function fillCbCards() {
   $('cb-card').innerHTML = cards.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
-  $('cb-card-cat').innerHTML = cats.expense.map((c) => `<option value="${esc(c.name)}">${esc(ICON_EMOJI[c.icon] || (ICONS[c.icon] ? '🏷️' : c.icon))} ${esc(c.name)}</option>`).join('');
+  $('cb-card-cat').innerHTML = cashbackCats.map((c) => `<option value="${esc(c.name)}">${esc(c.icon)} ${esc(c.name)}</option>`).join('');
 }
 
 // Выбор иконки (для категорий и счетов)
@@ -473,9 +493,10 @@ $('acc-form').onsubmit = (e) => {
 
 $('card-form').onsubmit = (e) => {
   e.preventDefault();
-  const d = { name: $('cb-card-name').value.trim(), cat: $('cb-card-cat').value, pct: +$('cb-card-pct').value };
-  if (editingCard) Object.assign(cards.find((c) => c.id === editingCard), d);
-  else cards.push({ id: Date.now(), ...d });
+  if (editingCard) {
+    const c=cards.find(x=>x.id===editingCard);
+    c.slots.push({cat:$('cb-card-cat').value,pct:+$('cb-card-pct').value});
+  } else cards.push({id:Date.now(),name:$('cb-card-name').value.trim(),logo:{color:'#8b7049',mark:$('cb-card-name').value.trim().slice(0,2).toUpperCase()},cat:$('cb-card-cat').value,pct:+$('cb-card-pct').value,slots:[{cat:$('cb-card-cat').value,pct:+$('cb-card-pct').value}]});
   save(); renderAll(); closeModal();
 };
 
@@ -550,9 +571,9 @@ function editCard(id) {
   editingCard = c.id;
   openModal('card');
   fillCbCards();
-  $('cb-card-name').value = c.name;
-  $('cb-card-cat').value = c.cat;
-  $('cb-card-pct').value = c.pct;
+  $('cb-card-name').parentElement.hidden = true;
+  $('card-form').querySelector('.h2').textContent = `Новый слот · ${c.name}`;
+  $('cb-card-pct').value = '';
 }
 
 function editGoal(id) {
@@ -962,13 +983,15 @@ function renderCashback() {
     <div class="swipe">
       <div class="swipe-actions"></div>
       <div class="li tap" data-id="${c.id}">
-        <div class="ic">${svgIcon('card')}</div>
-        <div class="grow"><div class="name">${esc(c.name)}</div><div class="note">${c.pct}% · ${esc(c.cat)}</div></div>
+        <div class="bank-logo" style="--brand:${esc(c.logo?.color||'#806f54')}"><svg viewBox="0 0 48 48" role="img" aria-label="${esc(c.name)}"><circle cx="24" cy="24" r="23"/><text x="24" y="29" text-anchor="middle">${esc(c.logo?.mark||c.name.slice(0,2))}</text></svg></div>
+        <div class="grow"><div class="name">${esc(c.name)}</div><div class="note">${(c.slots||[{cat:c.cat,pct:c.pct}]).map((s,i)=>`${i+1}. ${esc(s.cat||'Всё')} · ${s.pct||0}%`).join('　')}</div></div>
+        <button class="slot-add" type="button" aria-label="Добавить слот">＋</button>
       </div>
     </div>`).join('') : '<div class="empty">Карт нет. Добавь карту и её категорию кэшбэка</div>';
 
   $('card-list').querySelectorAll('.swipe').forEach((el) => {
     const cid = +el.querySelector('.li').dataset.id;
+    el.querySelector('.slot-add').onclick=(e)=>{e.stopPropagation();editCard(cid);};
     bindSwipe(el, [
       { icon: 'pencil', cls: 'sw-edit', cb: () => editCard(cid) },
       { icon: 'trash', cls: 'sw-del', cb: () => { if (confirm('Удалить карту из списка?')) { cards = cards.filter((c) => c.id !== cid); save(); renderAll(); } } },
@@ -1034,6 +1057,13 @@ $('add-cat').onclick = () => openModal('cat');
 $('add-pay').onclick = () => openModal('pay');
 $('add-acc').onclick = () => openModal('acc');
 $('add-card').onclick = () => openModal('card');
+$('add-cb-cat').onclick = () => {
+  const name=prompt('Название новой категории кэшбэка');
+  if(!name||!name.trim())return;
+  const icon=prompt('Эмодзи или значок для категории','✨')||'✨';
+  cashbackCats.push({name:name.trim(),icon:icon.trim()||'✨'});
+  save();fillCbCards();
+};
 $('add-cb').onclick = () => {
   if (!cards.length) { alert('Сначала добавь карту'); return; }
   openModal('cb');
