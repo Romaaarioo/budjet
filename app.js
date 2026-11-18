@@ -3,8 +3,8 @@
    ===================================================== */
 
 const $ = (id) => document.getElementById(id);
-const fmt = new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 });
-const money = (n, currency = 'RUB') => new Intl.NumberFormat('ru-RU', { style: 'currency', currency, maximumFractionDigits: currency === 'RUB' ? 0 : 2 }).format(n);
+const fmt = { format:n => new Intl.NumberFormat('ru-RU',{style:'currency',currency:'RUB',maximumFractionDigits:Number.isInteger(+n)?0:2,minimumFractionDigits:Number.isInteger(+n)?0:2}).format(n) };
+const money = (n, currency = 'RUB') => new Intl.NumberFormat('ru-RU',{style:'currency',currency,maximumFractionDigits:Number.isInteger(+n)?0:2,minimumFractionDigits:Number.isInteger(+n)?0:2}).format(n);
 const txCurrency = (t) => t.currency || (accounts.find(a=>a.id===(t.account||t.from))||{}).currency || 'RUB';
 const esc = (s) => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML.replace(/"/g, '&quot;'); };
 const load = (k, f) => { try { return JSON.parse(localStorage.getItem(k)) ?? f; } catch { return f; } };
@@ -53,6 +53,35 @@ const ICONS = {
   transfer:'<path d="M4 7h15"/><path d="m15 3 4 4-4 4"/><path d="M20 17H5"/><path d="m9 21-4-4 4-4"/>',
   list:    '<path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/>',
   pie:     '<path d="M21.2 15.9A10 10 0 1 1 8 2.8"/><path d="M22 12A10 10 0 0 0 12 2v10z"/>',
+  utensils:'<path d="M3 2v7a4 4 0 0 0 8 0V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v8h5zm0 0v7"/>',
+  pill:'<path d="m10.5 20.5 10-10a5.7 5.7 0 0 0-8-8l-10 10a5.7 5.7 0 0 0 8 8z"/><path d="m8.5 8.5 7 7"/>',
+  store:'<path d="M3 10v10h18V10"/><path d="M2 4h20l-2 6H4L2 4z"/><path d="M9 20v-6h6v6"/>',
+  train:'<rect x="5" y="3" width="14" height="15" rx="4"/><path d="M8 21l2-3m6 3-2-3M5 11h14M9 7h.01M15 7h.01"/>',
+  dog:'<path d="M4 10 2 7l4-2 3 2h6l3-2 4 2-2 3v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z"/><path d="M9 13h.01M15 13h.01M10 17h4"/>',
+  film:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 3v18m10-18v18M3 8h4m-4 8h4m10-8h4m-4 8h4"/>',
+  ticket:'<path d="M2 9a3 3 0 0 0 0 6v4h20v-4a3 3 0 0 1 0-6V5H2z"/><path d="M13 5v2m0 4v2m0 4v2"/>',
+  dumbbell:'<path d="m6.5 6.5 11 11m-14-8 5-5m8 16 5-5M3 8l5-5m8 18 5-5"/>',
+  hammer:'<path d="m15 12-8 8-4-4 8-8"/><path d="m18 9 3-3-3-3-3 3m-3 0 3 3"/>',
+  car:'<path d="m5 17-1 3m16-3 1 3M3 11l2-6h14l2 6"/><path d="M3 11h18v6H3z"/><circle cx="7.5" cy="14.5" r="1"/><circle cx="16.5" cy="14.5" r="1"/>',
+  flower:'<path d="M12 12c-5-8-9-2-3 1-8 1-5 8 2 4-2 8 6 8 4 0 7 4 10-3 2-4 6-3 2-9-3-1"/><circle cx="12" cy="12" r="2"/>',
+  scissors:'<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="m8 8 12 12M8 16 20 4"/>',
+  book:'<path d="M4 4h6a4 4 0 0 1 4 4v13a4 4 0 0 0-4-4H4z"/><path d="M20 4h-6v17a4 4 0 0 1 4-4h2z"/>',
+  music:'<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+  phone:'<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/>',
+  coffee:'<path d="M4 8h14v8a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M18 10h2a2 2 0 1 1 0 4h-2M8 3v2m5-2v2"/>',
+  wallet:'<rect x="3" y="5" width="18" height="15" rx="2"/><path d="M3 9h18m-5 5h2"/>',
+  building:'<path d="M3 21h18M5 21V5l7-3 7 3v16M9 9h.01M15 9h.01M9 13h.01M15 13h.01M10 21v-4h4v4"/>',
+  medical:'<path d="M10 3H6a2 2 0 0 0-2 2v4m10-6h4a2 2 0 0 1 2 2v4M4 15v4a2 2 0 0 0 2 2h4m4 0h4a2 2 0 0 0 2-2v-4"/><path d="M8 12h8m-4-4v8"/>',
+  map:'<path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15m6-12v15"/>',
+  fuel:'<path d="M4 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16M3 21h14M7 7h6v5H7z"/><path d="m16 10 3 2v6a2 2 0 0 0 4 0v-7l-3-3"/>',
+  baby:'<circle cx="12" cy="12" r="9"/><path d="M9 10h.01M15 10h.01M9 16c2 2 4 2 6 0M8 3l1 3m7-3-1 3"/>',
+  spa:'<path d="M12 22c5-4 7-10 7-18-8 0-14 4-14 11a7 7 0 0 0 7 7z"/><path d="M8 16c2-3 5-5 9-7"/>',
+  basket:'<path d="m3 10 2 11h14l2-11zM2 10h20M8 10l4-7 4 7m-4 0v7"/>',
+  sparkle2:'<path d="m12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l1 2.5 2.5 1-2.5 1L19 23l-1-2.5-2.5-1 2.5-1z"/>',
+  message:'<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8A8.5 8.5 0 0 1 8.7 3.9a8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"/>',
+  receipt:'<path d="M4 2v20l4-2 4 2 4-2 4 2V2l-4 2-4-2-4 2z"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+  handshake:'<path d="m11 17-4-4a2 2 0 0 0-3 0l-2 2 5 5 2-2"/><path d="m13 17 4-4a2 2 0 0 1 3 0l2 2-5 5-2-2"/><path d="m8 13 3-3a3 3 0 0 1 4 0l1 1-5 5"/><path d="m4 9 3-4 5 2m8 2-3-4-5 1"/>',
+  wifi:'<path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.95 16.11a6 6 0 0 1 6.1 0M12 20h.01"/>',
 };
 const svgIcon = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ICONS.sparkle}</svg>`;
 // иконка категории/счёта: ключ → SVG, иначе эмодзи
@@ -64,6 +93,7 @@ let invs = load('fin_investments', []);   // инвестиции
 let pays = load('fin_autopays', []);      // автоплатежи
 let accounts = load('fin_accounts', []);  // счета
 let cards = load('fin_cards', []);        // карты для кэшбэка
+const hadCashbackCategories = !!localStorage.getItem('fin_cb_categories');
 let cashbackCats = load('fin_cb_categories', null) || ['Всё','Продукты','Аптеки','Кафе и рестораны','Фастфуд','Одежда и обувь','Транспорт','Зоотовары','ЖД','Техника','Кино','Развлечения','Спорттовары','Дом и ремонт','Такси','Цветы','Фитнес','Маркетплейсы','Авиабилеты','Красота','Мед. услуги','Путешествия'].map((name,i)=>({name,icon:['✨','🛒','💊','🍽️','🍔','👕','🚇','🐾','🚆','💻','🎬','🎭','🏋️','🛠️','🚕','💐','🧘','📦','✈️','💄','🩺','🧳'][i]}));
 let cbOffers = load('fin_cb_offers', []);
 let cbs = load('fin_cashback', []);       // полученный кэшбэк
@@ -101,11 +131,15 @@ const DEFAULT_CATS = {
   income: [['Подработка','🧑‍💻'],['Кэшбэк','💸'],['Зарплата','💼'],['Премия','🏆'],['% по НС','🏦'],['Донорство','🩸'],['Другое','✨'],['Подарки','🎁'],['Рефералки','🤝'],['Акции','📈']],
   expense: [['Продукты','🛒'],['Дом','🏠'],['Проезд','🚌'],['Подарки','🎁'],['Вещи','🛍️'],['Аптека','💊'],['Домашний интернет','📶'],['Другое','✨'],['Забота о себе','🧖'],['Здоровье','❤️'],['Кафе и рестики','🍽️'],['Квартира','🏢'],['Комиссии','🧾'],['Коммуналка','💡'],['Кредит','🏦'],['Кредитки','💳'],['Налоги','📑'],['Образование','🎓'],['Одежда','👕'],['Отдых и развлечения','🎭'],['Подписки','🔁'],['Путешествия','✈️'],['Связь','📱'],['Содержанке','💝'],['Спорт','🏋️'],['Такси','🚕'],['Техника','💻'],['Фастфуд','🍔']],
 };
-const ICON_EMOJI = { food:'🍽️',cart:'🛒',bus:'🚌',home:'🏠',play:'🎬',heart:'❤️',refresh:'🔁',box:'📦',case:'💼',laptop:'💻',gift:'🎁',sparkle:'✨',shirt:'👕',plane:'✈️',cap:'🎓',paw:'🐾',cash:'💵',card:'💳',bank:'🏦',coins:'🪙',trend:'📈',gem:'💎' };
+const ICON_EMOJI = { food:'🍽️',cart:'🛒',bus:'🚌',home:'🏠',play:'🎬',heart:'❤️',refresh:'🔁',box:'📦',case:'💼',laptop:'💻',gift:'🎁',sparkle:'✨',shirt:'👕',plane:'✈️',cap:'🎓',paw:'🐾',cash:'💵',card:'💳',bank:'🏦',coins:'🪙',trend:'📈',gem:'💎',utensils:'🍽️',pill:'💊',store:'🏬',train:'🚆',dog:'🐾',film:'🎬',ticket:'🎟️',dumbbell:'🏋️',hammer:'🛠️',car:'🚕',flower:'💐',scissors:'✂️',book:'📚',music:'🎵',phone:'📱',coffee:'☕',wallet:'👛',building:'🏢',medical:'🩺',map:'🗺️',fuel:'⛽',baby:'👶',spa:'🧖',basket:'🛒',sparkle2:'✨' };
 // Миграция: старые эмодзи-иконки → ключи SVG
-const E2K = { '🍔':'food','🛒':'cart','🚌':'bus','🏠':'home','🎬':'play','💊':'heart','👕':'shirt','✈️':'plane','🎓':'cap','🐾':'paw','💼':'case','💻':'laptop','🎁':'gift','✨':'sparkle','📦':'box','💳':'card','🔄':'refresh','💵':'cash','🏦':'bank','🪙':'coins','📈':'trend','💎':'gem' };
+const E2K = { '🍔':'utensils','🍽️':'utensils','🛒':'basket','🚌':'bus','🏠':'home','🎬':'film','💊':'pill','👕':'shirt','✈️':'plane','🎓':'cap','🐾':'dog','💼':'case','💻':'laptop','🎁':'gift','✨':'sparkle2','📦':'box','💳':'card','🔄':'refresh','💵':'cash','🏦':'bank','🪙':'coins','📈':'trend','💎':'gem','🍎':'basket','🥑':'basket','🥩':'utensils','🥐':'utensils','🍕':'utensils','🍜':'utensils','☕':'coffee','🍰':'utensils','🧋':'coffee','🚕':'car','🚇':'train','🚲':'car','⛽':'fuel','🛞':'car','🧹':'home','🛋️':'home','🪴':'flower','🔧':'hammer','🧻':'home','🧴':'spa','🩺':'medical','🧘':'spa','🏋️':'dumbbell','⚽':'dumbbell','🎮':'film','🎟️':'ticket','🎨':'sparkle2','📚':'book','🎧':'music','📱':'phone','⌚':'phone','📺':'film','📶':'phone','🔌':'phone','🧳':'map','🏖️':'map','🏨':'building','🌿':'spa','🐶':'dog','🐱':'dog','👶':'baby','💐':'flower','💸':'coins','🧾':'receipt','💡':'sparkle','🔑':'home','🧺':'basket','🛍️':'basket','💝':'gift','🤝':'handshake','🩸':'medical','🏆':'gem','📑':'book' };
+Object.assign(E2K,{'🎭':'ticket','🛠️':'hammer','💄':'sparkle2','🚆':'train','🏢':'building','🧖':'spa','🧑‍💻':'laptop','🪙':'coins'});
+Object.assign(E2K,{'❤️':'heart','❤':'heart'});
 let migrated = false;
 [...cats.expense, ...cats.income, ...accounts].forEach((c) => { if (E2K[c.icon]) { c.icon = E2K[c.icon]; migrated = true; } });
+const CB_ICON_MAP={'Всё':'sparkle2','Продукты':'basket','Аптеки':'pill','Кафе и рестораны':'utensils','Фастфуд':'utensils','Одежда и обувь':'shirt','Транспорт':'bus','Зоотовары':'paw','ЖД':'train','Техника':'laptop','Кино':'film','Развлечения':'ticket','Спорттовары':'dumbbell','Дом и ремонт':'hammer','Такси':'car','Цветы':'flower','Фитнес':'spa','Маркетплейсы':'store','Авиабилеты':'plane','Красота':'sparkle','Мед. услуги':'medical','Путешествия':'map'};
+cashbackCats.forEach(c=>{if(E2K[c.icon]){c.icon=E2K[c.icon];migrated=true;}else if(!hadCashbackCategories&&CB_ICON_MAP[c.name]){c.icon=CB_ICON_MAP[c.name];migrated=true;}});
 accounts.forEach((a) => { if (!a.currency) { a.currency = 'RUB'; migrated = true; } });
 Object.entries(DEFAULT_CATS).forEach(([type, list]) => list.forEach(([name, icon]) => {
   if (!cats[type].some((c) => c.name === name)) { cats[type].push({ name, icon }); migrated = true; }
@@ -306,6 +340,11 @@ function openModal(kind) {
     $('cat-name').value = '';
     setSeg($('cat-form'), 'expense'); pickEmoji($('cat-form'), 'sparkle'); $('cat-emoji').value = '';
   }
+  if (kind === 'cbcat') {
+    $('cbcat-form').dataset.icon='sparkle2';
+    $('cbcat-icon').value='';
+    pickEmoji($('cbcat-form'),'sparkle2');
+  }
   if (kind === 'goal' && !editingGoal) $('goal-form').querySelector('.h2').textContent = 'Цель накоплений';
   if (kind === 'acc') {
     $('acc-start-wrap').hidden = !!editingAcc;
@@ -437,7 +476,7 @@ $('tx-account').onchange = syncTxForm;
 $('tx-from').onchange = syncTxForm;
 function fillCbCards() {
   $('cb-card').innerHTML = cards.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
-  $('cb-card-cat').innerHTML = cashbackCats.map((c) => `<option value="${esc(c.name)}">${esc(c.icon)} ${esc(c.name)}</option>`).join('');
+  $('cb-card-cat').innerHTML = cashbackCats.map((c) => `<option value="${esc(c.name)}">${esc(ICON_EMOJI[c.icon]||'◈')} ${esc(c.name)}</option>`).join('');
 }
 function fillTxCashback(bankId='', slotIndex=null) {
   $('tx-cb-bank').innerHTML='<option value="">Без кэшбэка</option>'+cards.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
@@ -470,11 +509,13 @@ $('tx-cb-amount').oninput=()=>{cbManualOverride=true;updateTxCashback();};
 $('tx-amount').addEventListener('input',()=>{cbManualOverride=false;updateTxCashback();});
 
 // Выбор иконки (для категорий и счетов)
-const CAT_EMOJIS = ['food','cart','bus','home','play','heart','shirt','plane','cap','paw','case','laptop','gift','sparkle','box','card','🍎','🥑','🥩','🥐','🍔','🍕','🍜','☕','🍰','🧋','🚕','🚇','🚲','⛽','🛞','🧹','🛋️','🪴','🔧','🧻','🧴','💊','🩺','🧘','🏋️','⚽','🎮','🎟️','🎨','📚','🎧','📱','⌚','📺','📶','🔌','🧳','🏖️','🏨','🌿','🐶','🐱','👶','💐','💸','🧾','💡','🔑','🧺','🛍️','💝','🤝','🩸','🏆','📑'];
+const CAT_EMOJIS = ['food','cart','basket','utensils','pill','store','bus','train','car','fuel','home','building','hammer','play','film','ticket','heart','medical','spa','shirt','plane','map','paw','dog','case','laptop','phone','wifi','gift','sparkle','sparkle2','box','card','cash','bank','coins','trend','gem','flower','dumbbell','scissors','book','music','coffee','wallet','baby','receipt','handshake'];
 const ACC_EMOJIS = ['cash','card','bank','coins','trend','gem'];
+const CB_ICON_KEYS = ['sparkle2','basket','cart','pill','utensils','shirt','bus','train','dog','laptop','film','ticket','dumbbell','hammer','car','flower','plane','spa','store','medical','map','home','coffee','wallet'];
 const renderEmojiRow = (el, list) => (el.innerHTML = list.map((k) => `<button type="button" data-k="${esc(k)}">${renderIcon(k)}</button>`).join(''));
 renderEmojiRow($('emoji-row'), CAT_EMOJIS);
 renderEmojiRow($('acc-emoji-row'), ACC_EMOJIS);
+renderEmojiRow($('cbcat-icon-row'), CB_ICON_KEYS);
 
 function pickEmoji(form, k) {
   form.dataset.icon = k;
@@ -567,7 +608,7 @@ $('cbcat-form').onsubmit=(e)=>{
   e.preventDefault();
   const name=$('cbcat-name').value.trim();
   if(cashbackCats.some(c=>c.name.toLowerCase()===name.toLowerCase())){alert('Такая категория уже есть');return;}
-  cashbackCats.push({name,icon:$('cbcat-icon').value.trim()||'✨'});
+  cashbackCats.push({name,icon:$('cbcat-form').dataset.icon||$('cbcat-icon').value.trim()||'✨'});
   save();fillCbCards();renderCashback();closeModal();
 };
 function updateOfferMaxOrder(){
@@ -578,7 +619,7 @@ $('offer-pct').oninput=$('offer-max-cb').oninput=updateOfferMaxOrder;
 $('cb-offer-form').onsubmit=(e)=>{
   e.preventDefault();
   const pct=+$('offer-pct').value,maxCashback=+$('offer-max-cb').value;
-  cbOffers.push({id:Date.now(),name:$('offer-name').value.trim(),bank:+$('offer-bank').value,pct,maxCashback,maxOrder:Math.floor(maxCashback/(pct/100)),date:$('offer-date').value});
+  cbOffers.push({id:Date.now(),name:$('offer-name').value.trim(),bank:+$('offer-bank').value,pct,minAmount:+$('offer-min-amount').value||0,maxCashback,maxOrder:Math.floor(maxCashback/(pct/100)),date:$('offer-date').value});
   save();renderCashback();closeModal();
 };
 
@@ -702,7 +743,6 @@ function accountBalance(a) {
 function renderOverview() {
   const rubAccounts = accounts.filter(a => (a.currency || 'RUB') === 'RUB');
   $('total-balance').textContent = money(rubAccounts.reduce((s,a)=>s+accountBalance(a),0),'RUB');
-  $('balance-note').hidden = !accounts.some(a => (a.currency || 'RUB') !== 'RUB');
   $('account-list').classList.toggle('ordering', orderingAccounts);
   $('order-mode').textContent = orderingAccounts ? 'Готово' : 'Изменить порядок';
   $('account-list').innerHTML = accounts.map((a) => {
@@ -978,7 +1018,7 @@ function renderHistory() {
         <div class="swipe-actions"></div>
         <div class="li tap" data-id="${t.id}">
           <div class="ic">${tr ? svgIcon('transfer') : catIcon(t.type, t.category)}</div>
-          <div class="grow"><div class="name">${tr ? 'Перевод' : esc(t.category)}</div>${t.note ? `<div class="note">${esc(t.note)}</div>` : ''}${tr ? `<div class="note">${from ? esc(from.name) : '—'} → ${to ? esc(to.name) : '—'}</div>` : acc ? `<div class="note">${esc(acc.name)}</div>` : ''}</div>
+          <div class="grow"><div class="name">${tr ? 'Перевод' : esc(t.category)}</div>${t.note ? `<div class="note note-comment">${svgIcon('message')}<span>${esc(t.note)}</span></div>` : ''}${tr ? `<div class="note note-account">${from?renderIcon(from.icon):''}<span>${from ? esc(from.name) : '—'}</span> → ${to?renderIcon(to.icon):''}<span>${to ? esc(to.name) : '—'}</span></div>` : acc ? `<div class="note note-account">${renderIcon(acc.icon)}<span>${esc(acc.name)}</span></div>` : ''}</div>
           <div class="amt-wrap"><div class="amt ${tr ? '' : inc ? 'in' : 'out'}">${tr ? '' : inc ? '+' : '−'}${money(t.amount, txCurrency(t))}</div>${t.cashback?.amount>0?`<div class="tx-cashback-note">Кэшбэк · ${money(t.cashback.amount,txCurrency(t))}</div>`:''}</div>
         </div>
       </div>`;
@@ -1050,9 +1090,11 @@ function renderCashback() {
   const sumAll = cbs.reduce((s, c) => s + c.amount, 0)+txs.reduce((s,t)=>s+(+t.cashback?.amount||0),0);
   $('cb-month').textContent = fmt.format(sumMonth);
   $('cb-total').textContent = 'Всего: ' + fmt.format(sumAll);
-  $('cb-categories').innerHTML=cashbackCats.map(c=>`<button class="cb-chip ${cbFilter===c.name?'on':''}" data-cat="${esc(c.name)}"><span>${esc(c.icon)}</span>${esc(c.name)}</button>`).join('');
+  $('cb-categories').innerHTML=cashbackCats.map(c=>`<button class="cb-chip ${cbFilter===c.name?'on':''}" data-cat="${esc(c.name)}"><span class="cb-chip-icon">${renderIcon(c.icon)}</span>${esc(c.name)}</button>`).join('');
   $('cb-categories').onclick=e=>{const b=e.target.closest('[data-cat]');if(b){cbFilter=b.dataset.cat;cbMode='categories';document.querySelectorAll('[data-cb-view]').forEach(x=>x.classList.toggle('on',x.dataset.cbView==='categories'));renderCashback();}};
   $('cb-categories').hidden=cbMode!=='categories';
+  $('add-card').hidden=cbMode!=='banks';
+  $('add-cb-cat').hidden=cbMode!=='banks';
   $('add-cb-offer').hidden=cbMode!=='offers';
   $('cb-section-name').textContent=cbMode==='offers'?'Специальные акции':cbMode==='banks'?'Все банки':cbFilter;
   let shown=cards;
@@ -1061,7 +1103,7 @@ function renderCashback() {
   $('card-list').className=`cb-list ${cbMode}`;
   if(cbMode==='offers'){
     $('cb-count').textContent=cbOffers.filter(o=>!o.date||o.date>=todayISO()).length;
-    $('card-list').innerHTML=cbOffers.length?cbOffers.map(o=>{const b=cards.find(c=>c.id===o.bank);return `<article class="cb-offer"><div class="cb-bank-head"><span class="cb-logo" style="--brand:${esc(b?.logo?.color||'#806f54')}">${esc(b?.logo?.mark||'Б')}</span><strong>${esc(o.name)}</strong><button class="cb-offer-del" data-offer="${o.id}" aria-label="Удалить акцию">×</button></div><div class="cb-offer-meta">${esc(b?.name||'Банк')} · ${o.pct}% · максимум ${money(o.maxCashback)} кэшбэка</div><div class="cb-offer-order">Максимальный заказ: <b>${money(o.maxOrder)}</b></div><div class="cb-offer-meta">${o.date?`До ${formatDate(o.date)}`:'Без срока'}</div></article>`}).join(''):'<div class="cb-empty">Специальных акций пока нет</div>';
+    $('card-list').innerHTML=cbOffers.length?cbOffers.map(o=>{const b=cards.find(c=>c.id===o.bank);return `<article class="cb-offer"><div class="cb-bank-head"><span class="cb-logo" style="--brand:${esc(b?.logo?.color||'#806f54')}">${esc(b?.logo?.mark||'Б')}</span><strong>${esc(o.name)}</strong><button class="cb-offer-del" data-offer="${o.id}" aria-label="Удалить акцию">×</button></div><div class="cb-offer-meta">${esc(b?.name||'Банк')} · ${o.pct}% · максимум ${money(o.maxCashback)} кэшбэка</div><div class="cb-offer-order">Заказ от ${money(o.minAmount||0)} до <b>${money(o.maxOrder)}</b></div><div class="cb-offer-meta">${o.date?`До ${formatDate(o.date)}`:'Без срока'}</div></article>`}).join(''):'<div class="cb-empty">Специальных акций пока нет</div>';
     $('card-list').onclick=e=>{const b=e.target.closest('[data-offer]');if(b&&confirm('Удалить акцию?')){cbOffers=cbOffers.filter(o=>o.id!==+b.dataset.offer);save();renderCashback();}};
     return;
   }
@@ -1133,6 +1175,7 @@ function renderPays() {
 
 // ---------- Запуск ----------
 $('add-goal').onclick = () => openModal('goal');
+$('add-inv').onclick = () => { editing=null; openModal('inv'); };
 $('add-cat').onclick = () => openModal('cat');
 $('add-pay').onclick = () => openModal('pay');
 $('add-acc').onclick = () => openModal('acc');
@@ -1141,10 +1184,6 @@ $('add-cb-cat').onclick = () => {
   $('cbcat-name').value='';$('cbcat-icon').value='✨';openModal('cbcat');
 };
 $('add-cb-offer').onclick=()=>openModal('cb-offer');
-$('add-cb').onclick = () => {
-  if (!cards.length) { alert('Сначала добавь карту'); return; }
-  openModal('cb');
-};
 function renderAll() { renderOverview(); renderAnalytics(); renderTrend(); renderGoals(); renderHistory(); renderInvestments(); renderCashback(); renderCats(); renderPays(); }
 runPays();
 renderAll();

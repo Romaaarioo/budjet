@@ -7,7 +7,7 @@
   <title>Мои Финансы</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="style.css?v=36">
+  <link rel="stylesheet" href="style.css?v=39">
   <script>
     // Тема и Liquid Glass применяются до отрисовки, чтобы не «мигало»
     const t = localStorage.getItem('fin_theme') || 'dark';
@@ -24,7 +24,6 @@
     <div class="card balance">
       <div class="lbl">Общий баланс</div>
       <div class="big" id="total-balance">0 ₽</div>
-      <div class="balance-note" id="balance-note" hidden>Учитываются только счета в RUB</div>
     </div>
     <button class="order-mode" id="order-mode" type="button">Изменить порядок</button>
     <div class="card list" id="account-list"></div>
@@ -80,6 +79,7 @@
     <h1 class="title">Инвестиции</h1>
     <div class="card"><div class="h2">Сводка</div><div id="invest-summary"></div></div>
     <div id="invest-list"></div>
+    <button class="btn primary block" id="add-inv">Добавить инвестицию</button>
   </section>
 
   <section id="view-cashback" class="view cashback-app">
@@ -92,8 +92,8 @@
       </nav>
     </header>
     <div class="cb-summary"><span>Получено в этом месяце <b id="cb-month">0 ₽</b></span><span id="cb-total">Всего: 0 ₽</span></div>
-    <div class="cb-footer cb-manage"><button class="cb-text-btn" id="add-card">＋ Добавить банк</button><button class="cb-text-btn" id="add-cb-cat">＋ Добавить категорию</button><button class="cb-text-btn" id="add-cb-offer" hidden>＋ Добавить акцию</button></div>
-    <div class="cb-actions"><div class="cb-chips" id="cb-categories"></div><button class="cb-purchase" id="add-cb">＋ <span>Отметить кэшбэк</span></button></div>
+    <div class="cb-footer cb-manage"><button class="cb-text-btn" id="add-card" data-cb-action="banks">＋ Добавить банк</button><button class="cb-text-btn" id="add-cb-cat" data-cb-action="banks">＋ Добавить категорию</button><button class="cb-text-btn" id="add-cb-offer" data-cb-action="offers" hidden>＋ Добавить акцию</button></div>
+    <div class="cb-actions"><div class="cb-chips" id="cb-categories"></div></div>
     <div class="cb-section-title"><strong id="cb-section-name">Все</strong><span class="cb-count" id="cb-count">0</span></div>
     <div class="cb-list" id="card-list"></div>
   </section>
@@ -249,6 +249,7 @@
       <label>Описание<input id="offer-name" placeholder="Например: Покупка в Пятёрочке" required></label>
       <label>Банк<select id="offer-bank"></select></label>
       <label>Кэшбэк, %<input id="offer-pct" type="number" min="0" step="0.1" required></label>
+      <label>Минимальная сумма заказа, ₽<input id="offer-min-amount" type="number" min="0" step="1" value="0"></label>
       <label>Максимум кэшбэка, ₽<input id="offer-max-cb" type="number" min="0" step="1" required></label>
       <label>Максимальная сумма заказа, ₽<input id="offer-max-order" type="number" readonly></label>
       <label>Действует до<input id="offer-date" type="date" required></label>
@@ -257,7 +258,8 @@
     <form id="cbcat-form" hidden>
       <div class="h2">Категория кэшбэка</div>
       <label>Название<input id="cbcat-name" placeholder="Например: Самокат" required></label>
-      <label>Иконка (эмодзи)<input id="cbcat-icon" maxlength="8" value="✨"></label>
+      <div id="cbcat-icon-row" class="emoji-row"></div>
+      <label>Свой значок<input id="cbcat-icon" class="emoji-input" maxlength="8" value="✨"></label>
       <div class="actions"><button type="button" class="btn ghost cancel">Отмена</button><button type="submit" class="btn primary">Сохранить</button></div>
     </form>
 
@@ -288,7 +290,7 @@
   </div>
 </div>
 
-<script src="app.js?v=36"></script>
+<script src="app.js?v=39"></script>
 </body>
 </html>
 
