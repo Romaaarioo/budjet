@@ -82,10 +82,21 @@ const ICONS = {
   receipt:'<path d="M4 2v20l4-2 4 2 4-2 4 2V2l-4 2-4-2-4 2z"/><path d="M8 8h8M8 12h8M8 16h5"/>',
   handshake:'<path d="m11 17-4-4a2 2 0 0 0-3 0l-2 2 5 5 2-2"/><path d="m13 17 4-4a2 2 0 0 1 3 0l2 2-5 5-2-2"/><path d="m8 13 3-3a3 3 0 0 1 4 0l1 1-5 5"/><path d="m4 9 3-4 5 2m8 2-3-4-5 1"/>',
   wifi:'<path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.95 16.11a6 6 0 0 1 6.1 0M12 20h.01"/>',
+  burger:'<path d="M3 10a9 7 0 0 1 18 0zM3 14h18M4 18h16M6 21h12"/><path d="M7 14v.01M12 14v.01M17 14v.01"/>',
+  pizza:'<path d="M4 6a18 18 0 0 1 16 0L12 21z"/><path d="m4 6 16 0"/><circle cx="10" cy="10" r="1"/><circle cx="15" cy="13" r="1"/><circle cx="11" cy="16" r="1"/>',
+  salad:'<path d="M3 12a9 9 0 0 0 18 0zM5 8c2-3 4-3 6 0m2-3c2-3 4-2 5 1"/><path d="m8 15 .01 0m4 2 .01 0m4-2 .01 0"/>',
+  bread:'<path d="M4 20V9a8 8 0 0 1 16 0v11z"/><path d="M9 8v2m5-3v3m3-2v2"/>',
+  iceCream:'<path d="m7 11 5 10 5-10"/><path d="M6 10a3 3 0 0 1 1-5 4 4 0 0 1 7-2 4 4 0 0 1 5 5 3 3 0 0 1-1 5H8a3 3 0 0 1-2-3z"/>',
+  gamepad:'<path d="M6 12h4m-2-2v4m7-1h.01M18 11h.01"/><path d="M6 7h12a4 4 0 0 1 4 4v5a2 2 0 0 1-3 1l-3-2H8l-3 2a2 2 0 0 1-3-1v-5a4 4 0 0 1 4-4z"/>',
+  stethoscope:'<path d="M6 3v5a4 4 0 0 0 8 0V3M4 3h4m4 0h4m-6 9v2a5 5 0 0 0 10 0v-1"/><circle cx="18" cy="10" r="2"/>',
+  sofa:'<path d="M4 11V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3"/><path d="M3 12a2 2 0 0 1 4 0v3h10v-3a2 2 0 0 1 4 0v6H3zM5 18v3m14-3v3"/>',
+  apple:'<path d="M12 8c-3-5-9-2-8 4 1 6 5 10 8 7 3 3 7-1 8-7 1-6-5-9-8-4z"/><path d="M12 8c0-3 2-5 5-5-1 3-2 4-5 5z"/>',
+  cosmetics:'<path d="M8 3h8v4H8zM9 7h6l1 14H8z"/><path d="M10 11h4"/>',
 };
 const svgIcon = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ICONS.sparkle}</svg>`;
 // иконка категории/счёта: ключ → SVG, иначе эмодзи
-const renderIcon = (icon) => (ICONS[icon] ? svgIcon(icon) : esc(icon));
+const renderIcon = (icon) => typeof icon==='string'&&icon.startsWith('emoji:')?esc(icon.slice(6)):ICONS[icon]?svgIcon(icon):esc(icon);
+const iconInputValue = (icon) => typeof icon==='string'&&icon.startsWith('emoji:')?icon.slice(6):ICONS[icon]?'':icon;
 
 // ---------- Данные ----------
 let txs = load('fin_transactions', []);   // доходы/расходы
@@ -136,6 +147,7 @@ const ICON_EMOJI = { food:'🍽️',cart:'🛒',bus:'🚌',home:'🏠',play:'�
 const E2K = { '🍔':'utensils','🍽️':'utensils','🛒':'basket','🚌':'bus','🏠':'home','🎬':'film','💊':'pill','👕':'shirt','✈️':'plane','🎓':'cap','🐾':'dog','💼':'case','💻':'laptop','🎁':'gift','✨':'sparkle2','📦':'box','💳':'card','🔄':'refresh','💵':'cash','🏦':'bank','🪙':'coins','📈':'trend','💎':'gem','🍎':'basket','🥑':'basket','🥩':'utensils','🥐':'utensils','🍕':'utensils','🍜':'utensils','☕':'coffee','🍰':'utensils','🧋':'coffee','🚕':'car','🚇':'train','🚲':'car','⛽':'fuel','🛞':'car','🧹':'home','🛋️':'home','🪴':'flower','🔧':'hammer','🧻':'home','🧴':'spa','🩺':'medical','🧘':'spa','🏋️':'dumbbell','⚽':'dumbbell','🎮':'film','🎟️':'ticket','🎨':'sparkle2','📚':'book','🎧':'music','📱':'phone','⌚':'phone','📺':'film','📶':'phone','🔌':'phone','🧳':'map','🏖️':'map','🏨':'building','🌿':'spa','🐶':'dog','🐱':'dog','👶':'baby','💐':'flower','💸':'coins','🧾':'receipt','💡':'sparkle','🔑':'home','🧺':'basket','🛍️':'basket','💝':'gift','🤝':'handshake','🩸':'medical','🏆':'gem','📑':'book' };
 Object.assign(E2K,{'🎭':'ticket','🛠️':'hammer','💄':'sparkle2','🚆':'train','🏢':'building','🧖':'spa','🧑‍💻':'laptop','🪙':'coins'});
 Object.assign(E2K,{'❤️':'heart','❤':'heart'});
+Object.assign(E2K,{'🍔':'burger','🍕':'pizza'});
 let migrated = false;
 [...cats.expense, ...cats.income, ...accounts].forEach((c) => { if (E2K[c.icon]) { c.icon = E2K[c.icon]; migrated = true; } });
 const CB_ICON_MAP={'Всё':'sparkle2','Продукты':'basket','Аптеки':'pill','Кафе и рестораны':'utensils','Фастфуд':'utensils','Одежда и обувь':'shirt','Транспорт':'bus','Зоотовары':'paw','ЖД':'train','Техника':'laptop','Кино':'film','Развлечения':'ticket','Спорттовары':'dumbbell','Дом и ремонт':'hammer','Такси':'car','Цветы':'flower','Фитнес':'spa','Маркетплейсы':'store','Авиабилеты':'plane','Красота':'sparkle','Мед. услуги':'medical','Путешествия':'map'};
@@ -509,9 +521,9 @@ $('tx-cb-amount').oninput=()=>{cbManualOverride=true;updateTxCashback();};
 $('tx-amount').addEventListener('input',()=>{cbManualOverride=false;updateTxCashback();});
 
 // Выбор иконки (для категорий и счетов)
-const CAT_EMOJIS = ['food','cart','basket','utensils','pill','store','bus','train','car','fuel','home','building','hammer','play','film','ticket','heart','medical','spa','shirt','plane','map','paw','dog','case','laptop','phone','wifi','gift','sparkle','sparkle2','box','card','cash','bank','coins','trend','gem','flower','dumbbell','scissors','book','music','coffee','wallet','baby','receipt','handshake'];
+const CAT_EMOJIS = ['food','burger','pizza','salad','bread','iceCream','utensils','cart','basket','pill','medical','stethoscope','store','bus','train','car','fuel','home','building','sofa','hammer','play','film','ticket','gamepad','heart','spa','cosmetics','shirt','plane','map','paw','dog','baby','case','laptop','phone','wifi','gift','sparkle','sparkle2','box','card','cash','bank','coins','trend','gem','flower','dumbbell','scissors','book','music','coffee','wallet','receipt','handshake'];
 const ACC_EMOJIS = ['cash','card','bank','coins','trend','gem'];
-const CB_ICON_KEYS = ['sparkle2','basket','cart','pill','utensils','shirt','bus','train','dog','laptop','film','ticket','dumbbell','hammer','car','flower','plane','spa','store','medical','map','home','coffee','wallet'];
+const CB_ICON_KEYS = [...CAT_EMOJIS];
 const renderEmojiRow = (el, list) => (el.innerHTML = list.map((k) => `<button type="button" data-k="${esc(k)}">${renderIcon(k)}</button>`).join(''));
 renderEmojiRow($('emoji-row'), CAT_EMOJIS);
 renderEmojiRow($('acc-emoji-row'), ACC_EMOJIS);
@@ -529,7 +541,7 @@ document.querySelectorAll('.emoji-row').forEach((row) => (row.onclick = (e) => {
 }));
 document.querySelectorAll('.emoji-input').forEach((inp) => (inp.oninput = (e) => {
   const v = e.target.value.trim();
-  if (v) pickEmoji(inp.closest('form'), v);
+  if (v) pickEmoji(inp.closest('form'), `emoji:${v}`);
 }));
 
 // ---------- Сохранение форм ----------
@@ -691,6 +703,7 @@ function editAcc(id) {
   $('acc-currency').value = a.currency || 'RUB';
   $('acc-currency').disabled = false;
   pickEmoji($('acc-form'), a.icon);
+  $('acc-emoji').value = iconInputValue(a.icon);
 }
 
 function editCard(id) {
@@ -729,7 +742,7 @@ function editCat(type, name) {
   openModal('cat');
   $('cat-form').querySelector('.h2').textContent = 'Редактировать категорию';
   $('cat-type').hidden = true;
-  $('cat-name').value = c.name; $('cat-emoji').value = ICONS[c.icon] ? '' : c.icon;
+  $('cat-name').value = c.name; $('cat-emoji').value = iconInputValue(c.icon);
   pickEmoji($('cat-form'), c.icon);
 }
 
