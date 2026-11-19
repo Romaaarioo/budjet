@@ -363,7 +363,9 @@ body::before, body::after { display: none !important; animation: none !important
 .order-mode { display:block; margin: 0 0 10px auto; border:0; background:none; color:var(--acc); font-weight:600; font-size:14px; font-family:inherit; padding:8px 4px; }
 .drag-handle { display:none; color:var(--muted); font-size:22px; padding:4px 8px; cursor:grab; touch-action:none; }
 .account-order-controls { display:none; gap:5px; }
-#account-list.ordering .account-order-controls { display:flex; }
+#account-list.ordering .account-order-controls, #cat-list.ordering .account-order-controls { display:flex; }
+.cb-offer-total { padding:14px 16px; border-bottom:1px solid var(--sep); color:var(--muted); font-size:13px; }
+.cb-offer-total b { color:var(--text); font-weight:600; }
 .account-order-controls button { width:30px; height:28px; border:1px solid var(--sep); border-radius:8px; color:var(--muted); background:var(--field); }
 .balance-note { margin-top:6px; color:var(--muted); font-size:12px; }
 .row .switch { margin-left:auto; }

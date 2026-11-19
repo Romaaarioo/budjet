@@ -5,6 +5,7 @@
 const $ = (id) => document.getElementById(id);
 const fmt = { format:n => new Intl.NumberFormat('ru-RU',{style:'currency',currency:'RUB',maximumFractionDigits:Number.isInteger(+n)?0:2,minimumFractionDigits:Number.isInteger(+n)?0:2}).format(n) };
 const money = (n, currency = 'RUB') => new Intl.NumberFormat('ru-RU',{style:'currency',currency,maximumFractionDigits:Number.isInteger(+n)?0:2,minimumFractionDigits:Number.isInteger(+n)?0:2}).format(n);
+const num = (n) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(n);
 const txCurrency = (t) => t.currency || (accounts.find(a=>a.id===(t.account||t.from))||{}).currency || 'RUB';
 const esc = (s) => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML.replace(/"/g, '&quot;'); };
 const load = (k, f) => { try { return JSON.parse(localStorage.getItem(k)) ?? f; } catch { return f; } };
@@ -340,13 +341,13 @@ function openModal(kind) {
   modalScrollY = window.scrollY;
   ['tx', 'inv', 'cat', 'pay', 'acc', 'card', 'cb', 'budget', 'goal', 'cb-offer', 'cbcat'].forEach((k) => ($(`${k}-form`).hidden = k !== kind));
   modal.classList.add('open');
+  document.querySelector('.sheet').scrollTop = 0;
   document.body.style.overflow = 'hidden'; // фон не скроллится, пока открыто окно
   if (kind === 'tx' && editingTx === null) {
     setSeg($('tx-form'), 'expense');
     $('tx-amount').value = ''; $('tx-note').value = '';
     $('tx-date').value = todayISO(); fillCat(); fillAcc(); syncTxForm();
     fillTxCashback(); cbManualOverride=false;
-    $('tx-repeat').hidden = !txs.length;
   }
   if (kind === 'cat' && !editingCat) {
     $('cat-form').querySelector('.h2').textContent = 'Новая категория';
@@ -465,14 +466,6 @@ $('tx-chips').onclick = (e) => {
   const b = e.target.closest('button');
   if (b) $('tx-amount').value = b.dataset.v;
 };
-$('tx-repeat').onclick = () => {
-  const last = [...txs].sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id)[0];
-  setSeg($('tx-form'), last.type);
-  fillAcc(); syncTxForm();
-  $('tx-amount').value = last.amount;
-  if (last.type === 'transfer') { $('tx-from').value = last.from; $('tx-to').value = last.to; $('tx-note').value = last.note || ''; }
-  else { fillCat(); $('tx-category').value = last.category; $('tx-account').value = last.account; $('tx-note').value = last.note || ''; }
-};
 
 // Показ полей: перевод — «откуда/куда», расход/доход — категория и счёт
 function syncTxForm() {
@@ -494,10 +487,18 @@ function fillCbCards() {
   $('cb-card').innerHTML = cards.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
   $('cb-card-cat').innerHTML = cashbackCats.map((c) => `<option value="${esc(c.name)}">${esc(ICON_EMOJI[c.icon]||'◈')} ${esc(c.name)}</option>`).join('');
 }
-function fillTxCashback(bankId='', slotIndex=null) {
+function fillTxCashback(bankId='', slotIndex=null, offerId=null) {
   $('tx-cb-bank').innerHTML='<option value="">Без кэшбэка</option>'+cards.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
   $('tx-cb-bank').value=bankId||'';
+  fillTxOffers(offerId);
   fillTxSlots(slotIndex);
+}
+function fillTxOffers(offerId=null) {
+  const bankId=+$('tx-cb-bank').value;
+  const offers=cbOffers.filter(o=>o.bank===bankId&&(!o.date||o.date>=todayISO()));
+  $('tx-cb-offer').innerHTML='<option value="">Без акции</option>'+offers.map(o=>`<option value="${o.id}">${esc(o.name)} · ${o.pct}%</option>`).join('');
+  $('tx-cb-offer').value=offerId&&offers.some(o=>o.id===offerId)?String(offerId):'';
+  $('tx-cb-offer-wrap').hidden=!offers.length;
 }
 function fillTxSlots(selected=null) {
   const bank=cards.find(c=>c.id===+$('tx-cb-bank').value);
@@ -510,17 +511,20 @@ function fillTxSlots(selected=null) {
 function updateTxCashback() {
   if(!$('tx-cb-bank')||$('tx-form').dataset.type!=='expense')return;
   const bank=cards.find(c=>c.id===+$('tx-cb-bank').value),slot=bank?.slots?.[+$('tx-cb-slot').value];
-  const q=cashbackQuote(+$('tx-amount').value,bank,slot,editingTx);
-  const value=cbManualOverride?Math.min(+$('tx-cb-amount').value||0,q.remaining):q.value;
+  const offer=cbOffers.find(o=>o.id===+$('tx-cb-offer').value);
+  const active=offer||(slot&&+slot.pct>0?slot:null);
+  const q=cashbackQuote(+$('tx-amount').value,bank,offer?{pct:offer.pct}:slot,editingTx);
+  const value=Math.min(cbManualOverride?(+$('tx-cb-amount').value||0):q.value,q.remaining,offer?offer.maxCashback:Infinity);
   $('tx-cb-amount').value=value||'';
-  $('tx-cb-amount-wrap').hidden=!bank||!slot||!(+slot.pct>0);
+  $('tx-cb-amount-wrap').hidden=!bank||!active;
   $('tx-cb-progress-wrap').hidden=!bank||bank.monthlyLimit==null;
   if(bank?.monthlyLimit>0)$('tx-cb-progress').style.width=`${Math.min(100,Math.max(0,(bank.monthlyLimit-q.remaining+value)/bank.monthlyLimit*100))}%`;
   const limit=bank?.monthlyLimit;
-  $('tx-cb-estimate').textContent=bank&&slot&&+slot.pct>0?`${q.eligible} ₽ учитывается · лимит: ${limit==null?'без лимита':`${money(Math.max(0,limit-q.remaining))} из ${money(limit)}`} · после покупки останется ${limit==null?'без лимита':money(Math.max(0,q.remaining-value))}`:'';
+  $('tx-cb-estimate').textContent=bank&&active?`${q.eligible} ₽ учитывается · лимит: ${limit==null?'без лимита':`${money(Math.max(0,limit-q.remaining))} из ${money(limit)}`} · после покупки останется ${limit==null?'без лимита':money(Math.max(0,q.remaining-value))}`:'';
 }
-$('tx-cb-bank').onchange=()=>{cbManualOverride=false;fillTxSlots();};
+$('tx-cb-bank').onchange=()=>{cbManualOverride=false;fillTxOffers();fillTxSlots();};
 $('tx-cb-slot').onchange=()=>{cbManualOverride=false;updateTxCashback();};
+$('tx-cb-offer').onchange=()=>{cbManualOverride=false;updateTxCashback();};
 $('tx-cb-amount').oninput=()=>{cbManualOverride=true;updateTxCashback();};
 $('tx-amount').addEventListener('input',()=>{cbManualOverride=false;updateTxCashback();});
 
@@ -559,12 +563,12 @@ $('tx-form').onsubmit = (e) => {
     if (accounts.find(a=>a.id===from)?.currency !== accounts.find(a=>a.id===to)?.currency) { alert('Переводы между разными валютами пока недоступны без курса'); return; }
     d = { type, amount: +$('tx-amount').value, from, to, cashback:null, note: $('tx-note').value.trim(), date: $('tx-date').value || todayISO() };
   } else {
-    const bank=cards.find(c=>c.id===+$('tx-cb-bank').value),slotIndex=+$('tx-cb-slot').value,slot=bank?.slots?.[slotIndex];
+    const bank=cards.find(c=>c.id===+$('tx-cb-bank').value),slotIndex=+$('tx-cb-slot').value,slot=bank?.slots?.[slotIndex],offer=cbOffers.find(o=>o.id===+$('tx-cb-offer').value);
     d = {
       type, amount: +$('tx-amount').value,
       category: $('tx-category').value, account: +$('tx-account').value,
       currency: accounts.find(a=>a.id===+$('tx-account').value)?.currency || 'RUB',
-      cashback: type==='expense'&&bank&&slot&&+slot.pct>0?{bankId:bank.id,slotIndex,category:slot.cat,percent:+slot.pct,amount:+$('tx-cb-amount').value||0,manual:cbManualOverride}:null,
+      cashback: type==='expense'&&bank&&(offer||(slot&&+slot.pct>0))?{bankId:bank.id,slotIndex:slot?slotIndex:null,category:offer?offer.name:slot.cat,percent:offer?offer.pct:+slot.pct,amount:+$('tx-cb-amount').value||0,manual:cbManualOverride,offerId:offer?offer.id:null}:null,
       note: $('tx-note').value.trim(), date: $('tx-date').value || todayISO(),
     };
   }
@@ -690,7 +694,7 @@ function editTx(id) {
     $('tx-category').value = t.category;
     $('tx-account').value = t.account || (accounts[0] && accounts[0].id);
   }
-  fillTxCashback(t.cashback?.bankId||'',t.cashback?.slotIndex??null);
+  fillTxCashback(t.cashback?.bankId||'',t.cashback?.slotIndex??null,t.cashback?.offerId??null);
   cbManualOverride=!!t.cashback?.manual;
   if(t.cashback)$('tx-cb-amount').value=t.cashback.amount;
   syncTxForm();
@@ -1123,6 +1127,10 @@ function renderCashback() {
   if(cbMode==='offers'){
     $('cb-count').textContent=cbOffers.filter(o=>!o.date||o.date>=todayISO()).length;
     $('card-list').innerHTML=cbOffers.length?cbOffers.map(o=>{const b=cards.find(c=>c.id===o.bank);return `<article class="cb-offer"><div class="cb-bank-head"><span class="cb-logo" style="--brand:${esc(b?.logo?.color||'#806f54')}">${esc(b?.logo?.mark||'Б')}</span><strong>${esc(o.name)}</strong><button class="cb-offer-del" data-offer="${o.id}" aria-label="Удалить акцию">×</button></div><div class="cb-offer-meta">${esc(b?.name||'Банк')} · ${o.pct}% · максимум ${money(o.maxCashback)} кэшбэка</div><div class="cb-offer-order">Заказ от ${money(o.minAmount||0)} до <b>${money(o.maxOrder)}</b></div><div class="cb-offer-meta">${o.date?`До ${formatDate(o.date)}`:'Без срока'}</div></article>`}).join(''):'<div class="cb-empty">Специальных акций пока нет</div>';
+    const offerTxs=txs.filter(t=>t.cashback?.offerId&&t.date.startsWith(m));
+    const offerGot=id=>offerTxs.filter(t=>t.cashback.offerId===id).reduce((s,t)=>s+(+t.cashback.amount||0),0);
+    $('card-list').insertAdjacentHTML('afterbegin',`<div class="cb-offer-total">Получено по акциям в этом месяце <b>${money(offerTxs.reduce((s,t)=>s+(+t.cashback.amount||0),0))}</b></div>`);
+    $('card-list').querySelectorAll('.cb-offer').forEach((el,i)=>el.insertAdjacentHTML('beforeend',`<div class="cb-offer-meta">Получено в этом месяце: <b>${money(offerGot(cbOffers[i].id))}</b></div>`));
     $('card-list').onclick=e=>{const b=e.target.closest('[data-offer]');if(b&&confirm('Удалить акцию?')){cbOffers=cbOffers.filter(o=>o.id!==+b.dataset.offer);save();renderCashback();}};
     return;
   }
@@ -1133,7 +1141,7 @@ function renderCashback() {
     const logo=`<span class="cb-logo" style="--brand:${esc(c.logo?.color||'#53627b')}">${esc(c.logo?.mark||c.name.slice(0,2))}</span>`;
     if(cbMode==='banks'){
       const used=cashbackUsed(c),limit=c.monthlyLimit,progress=limit?Math.min(100,used/limit*100):0;
-      return `<article class="cb-bank"><div class="cb-bank-head">${logo}<strong>${esc(c.name)}</strong><button class="cb-add-slot" data-bank="${c.id}" aria-label="Добавить слот">＋</button></div>${limit?`<div class="cb-limit"><div class="cb-limit-label"><span>Лимит за месяц</span><b>${money(Math.max(0,limit-used))} осталось · ${money(limit)}</b></div><div class="cb-limit-track"><i style="width:${progress}%"></i></div></div>`:`<div class="cb-limit-label">Месячный лимит не задан</div>`}<div class="cb-slots">${slots.map((s,i)=>`<button class="cb-slot" data-bank="${c.id}" data-slot="${i}"><span>${esc(s.cat||'Выбрать категорию')}${s.condition?` · ${esc(s.condition)}`:''}</span><b>${s.pct||0}%</b></button>`).join('')}</div></article>`;
+      return `<article class="cb-bank"><div class="cb-bank-head">${logo}<strong>${esc(c.name)}</strong><button class="cb-add-slot" data-bank="${c.id}" aria-label="Добавить слот">＋</button></div>${limit?`<div class="cb-limit"><div class="cb-limit-label"><span>Лимит за месяц</span><b>осталось ${num(Math.max(0,limit-used))} из ${num(limit)} ₽</b></div><div class="cb-limit-track"><i style="width:${progress}%"></i></div></div>`:`<div class="cb-limit-label">Месячный лимит не задан</div>`}<div class="cb-slots">${slots.map((s,i)=>`<button class="cb-slot" data-bank="${c.id}" data-slot="${i}"><span>${esc(s.cat||'Выбрать категорию')}${s.condition?` · ${esc(s.condition)}`:''}</span><b>${s.pct||0}%</b></button>`).join('')}</div></article>`;
     }
     return `<button class="cb-bank-row" data-bank="${c.id}">${logo}<strong>${esc(c.name)}</strong><b class="cb-rate">${best}%</b></button>`;
   }).join('')||'<div class="cb-empty">Пока нет банков с этой категорией</div>';
@@ -1141,14 +1149,19 @@ function renderCashback() {
 }
 
 // ---------- Рендер: КАТЕГОРИИ и АВТОПЛАТЕЖИ ----------
+let orderingCats = false;
+$('cat-order-mode').onclick = () => { orderingCats = !orderingCats; renderCats(); };
 function renderCats() {
   const row = (c, t) => `
     <div class="swipe">
       <div class="swipe-actions"></div>
       <div class="li" data-n="${esc(c.name)}" data-t="${t}">
         <div class="ic">${renderIcon(c.icon)}</div><div class="grow name">${esc(c.name)}</div>
+        <span class="account-order-controls"><button type="button" data-cmove="-1" aria-label="Выше">↑</button><button type="button" data-cmove="1" aria-label="Ниже">↓</button></span>
       </div>
     </div>`;
+  $('cat-list').classList.toggle('ordering', orderingCats);
+  $('cat-order-mode').textContent = orderingCats ? 'Готово' : 'Изменить порядок';
   $('cat-list').innerHTML =
     '<div class="sec">Расходы</div>' + cats.expense.map((c) => row(c, 'expense')).join('') +
     '<div class="sec">Доходы</div>' + cats.income.map((c) => row(c, 'income')).join('');
@@ -1167,6 +1180,13 @@ function renderCats() {
         save(); renderAll();
       } },
     ], () => editCat(type, name));
+    el.querySelectorAll('[data-cmove]').forEach((b) => (b.onclick = (e) => {
+      e.stopPropagation();
+      const i = cats[type].findIndex((c) => c.name === name), j = i + (+b.dataset.cmove);
+      if (j < 0 || j >= cats[type].length) return;
+      [cats[type][i], cats[type][j]] = [cats[type][j], cats[type][i]];
+      save(); renderCats();
+    }));
   });
 }
 
