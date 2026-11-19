@@ -7,7 +7,7 @@
   <title>Мои Финансы</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="style.css?v=44">
+  <link rel="stylesheet" href="style.css?v=45">
   <script>
     // Тема и Liquid Glass применяются до отрисовки, чтобы не «мигало»
     const t = localStorage.getItem('fin_theme') || 'dark';
@@ -125,9 +125,9 @@
   <section id="view-categories" class="view">
     <button class="back" data-go="more">‹ Ещё</button>
     <h1 class="title">Категории</h1>
+    <button class="btn primary block" id="add-cat">Добавить категорию</button>
     <button class="order-mode" id="cat-order-mode" type="button">Изменить порядок</button>
     <div class="card list" id="cat-list"></div>
-    <button class="btn primary block" id="add-cat">Добавить категорию</button>
   </section>
 
   <section id="view-autopays" class="view">
@@ -186,7 +186,6 @@
         <label id="tx-cb-cat-wrap">Категория кэшбэка<select id="tx-cb-slot"></select></label>
         <div class="cb-estimate" id="tx-cb-estimate"></div>
         <div class="tx-limit-track" id="tx-cb-progress-wrap" hidden><i id="tx-cb-progress"></i></div>
-        <label id="tx-cb-offer-wrap" hidden>Спец акция<select id="tx-cb-offer"></select></label>
         <label id="tx-cb-amount-wrap" hidden>Сумма кэшбэка<input type="number" id="tx-cb-amount" min="0" step="1"></label>
       </div>
       <div id="tx-transfer-wrap" hidden>
@@ -277,6 +276,7 @@
       <label>Сумма, ₽<input type="number" id="pay-amount" inputmode="decimal" min="0" step="0.01" placeholder="0" required></label>
       <label>День месяца (1–31)<input type="number" id="pay-day" inputmode="numeric" min="1" max="31" placeholder="5" required></label>
       <label>Списывать со счёта<select id="pay-account" required></select></label>
+      <label>Категория расходов<select id="pay-category" required></select></label>
       <div class="actions"><button type="button" class="btn ghost cancel">Отмена</button><button type="submit" class="btn primary">Сохранить</button></div>
     </form>
     <form id="goal-form" hidden>
@@ -291,7 +291,7 @@
   </div>
 </div>
 
-<script src="app.js?v=44"></script>
+<script src="app.js?v=45"></script>
 </body>
 </html>
 
