@@ -324,6 +324,7 @@ function runPays() {
 
 // ---------- Модальное окно ----------
 const modal = $('modal');
+let modalScrollY = 0;
 let editing = null;      // id редактируемой инвестиции
 let editingTx = null;    // id редактируемой операции
 let editingAcc = null;   // id редактируемого счёта
@@ -336,6 +337,7 @@ let cbManualOverride=false;
 let editingOffer=null;
 
 function openModal(kind) {
+  modalScrollY = window.scrollY;
   ['tx', 'inv', 'cat', 'pay', 'acc', 'card', 'cb', 'budget', 'goal', 'cb-offer', 'cbcat'].forEach((k) => ($(`${k}-form`).hidden = k !== kind));
   modal.classList.add('open');
   document.body.style.overflow = 'hidden'; // фон не скроллится, пока открыто окно
@@ -391,6 +393,7 @@ function openModal(kind) {
 function closeModal() {
   modal.classList.remove('open');
   document.body.style.overflow = '';
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   document.querySelectorAll('.sheet form').forEach((f) => f.reset());
   editing = null;
   editingTx = null;
@@ -403,6 +406,7 @@ function closeModal() {
   cbSlotIndex = null;
   cbManualOverride=false;
   editingOffer=null;
+  requestAnimationFrame(() => window.scrollTo(0, modalScrollY));
 }
 $('fab').onclick = () => openModal('tx');
 modal.onclick = (e) => { if (e.target === modal) closeModal(); };
@@ -614,7 +618,9 @@ $('card-form').onsubmit = (e) => {
     if(cbSlotIndex==null)c.slots.push(slot);else c.slots[cbSlotIndex]=slot;
   } else cards.push({id:Date.now(),name:$('cb-card-name').value.trim(),logo:{color:'#8b7049',mark:$('cb-card-name').value.trim().slice(0,2).toUpperCase()},cat:$('cb-card-cat').value,pct:+$('cb-card-pct').value,slots:[{cat:$('cb-card-cat').value,pct:+$('cb-card-pct').value,condition:$('cb-card-condition').value.trim()}]});
   cbSlotIndex=null;
-  save(); renderAll(); closeModal();
+  const y=modalScrollY;
+  save(); closeModal(); renderCashback();
+  requestAnimationFrame(()=>window.scrollTo(0,y));
 };
 $('cbcat-form').onsubmit=(e)=>{
   e.preventDefault();

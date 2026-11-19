@@ -382,6 +382,7 @@ body::before, body::after { display: none !important; animation: none !important
 .bank-logo text { fill:#fff; font:700 12px Arial,sans-serif; }
 .slot-add { border:0; background:var(--field); color:var(--acc); border-radius:10px; width:34px; height:34px; font-size:20px; }
 #view-cashback.cashback-app { padding:0 16px 24px; color:var(--text); background:var(--bg); }
+.cashback-app { overflow-anchor:none; }
 .cashback-app > .title { padding-left:0; padding-right:0; }
 .cb-top { margin-bottom:16px; }
 .cb-tabs { display:flex; padding:2px; border-radius:10px; background:rgba(120,120,100,.2); }
@@ -400,6 +401,7 @@ body::before, body::after { display: none !important; animation: none !important
 .cb-section-title { display:flex; align-items:center; gap:10px; margin:18px 4px 10px; font-size:17px; }
 .cb-count { padding:2px 7px; border-radius:10px; color:var(--muted); background:var(--field); font-size:12px; }
 .cb-list { overflow:hidden; border:1px solid rgba(180,170,145,.12); border-radius:20px; background:var(--card); }
+.cb-list, .cb-bank { overflow-anchor:none; }
 .cb-bank-row { display:flex; align-items:center; gap:12px; width:100%; min-height:60px; padding:12px 16px; border:0; border-bottom:1px solid var(--sep); color:var(--text); background:transparent; text-align:left; font:inherit; font-size:16px; }
 .cb-bank-row:last-child { border-bottom:0; }
 .cb-bank-row strong { flex:1; }
