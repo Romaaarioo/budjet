@@ -107,7 +107,7 @@ let accounts = load('fin_accounts', []);  // счета
 let cards = load('fin_cards', []);        // карты для кэшбэка
 const hadCashbackCategories = !!localStorage.getItem('fin_cb_categories');
 let cashbackCats = load('fin_cb_categories', null) || ['Всё','Продукты','Аптеки','Кафе и рестораны','Фастфуд','Одежда и обувь','Транспорт','Зоотовары','ЖД','Техника','Кино','Развлечения','Спорттовары','Дом и ремонт','Такси','Цветы','Фитнес','Маркетплейсы','Авиабилеты','Красота','Мед. услуги','Путешествия'].map((name,i)=>({name,icon:['✨','🛒','💊','🍽️','🍔','👕','🚇','🐾','🚆','💻','🎬','🎭','🏋️','🛠️','🚕','💐','🧘','📦','✈️','💄','🩺','🧳'][i]}));
-let cbOffers = load('fin_cb_offers', []);
+let cbOffers = load('fin_cb_offers', []).map(o=>{if(o.date&&!o.dateTo){o.dateTo=o.date;delete o.date;}if(!o.dateFrom&&o.dateTo)o.dateFrom=o.dateTo;return o;});
 let cbs = load('fin_cashback', []);       // полученный кэшбэк
 let budgets = load('fin_budgets', {});    // лимиты: категория → сумма в месяц
 let goals = load('fin_goals', []);
@@ -327,6 +327,15 @@ function runPays() {
 // ---------- Модальное окно ----------
 const modal = $('modal');
 let modalScrollY = 0;
+function fitSheetToViewport() {
+  if (!modal.classList.contains('open')) return;
+  const vv = window.visualViewport;
+  if (!vv) return;
+  modal.style.height = `${vv.height}px`;
+  modal.style.top = `${vv.offsetTop}px`;
+}
+window.visualViewport?.addEventListener('resize', fitSheetToViewport);
+window.visualViewport?.addEventListener('scroll', fitSheetToViewport);
 let editing = null;      // id редактируемой инвестиции
 let editingTx = null;    // id редактируемой операции
 let editingAcc = null;   // id редактируемого счёта
@@ -344,6 +353,7 @@ function openModal(kind) {
   modal.classList.add('open');
   document.querySelector('.sheet').scrollTop = 0;
   document.body.style.overflow = 'hidden'; // фон не скроллится, пока открыто окно
+  fitSheetToViewport();
   if (kind === 'tx' && editingTx === null) {
     setSeg($('tx-form'), 'expense');
     $('tx-amount').value = ''; $('tx-note').value = '';
@@ -372,7 +382,8 @@ function openModal(kind) {
   if (kind === 'cb') { $('cb-date').value = todayISO(); fillCbCards(); }
   if (kind === 'cb-offer') {
     $('offer-bank').innerHTML=cards.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
-    $('offer-date').value='';
+    $('offer-date-from').value=todayISO();
+    $('offer-date-to').value=todayISO();
     updateOfferMaxOrder();
   }
   if (kind === 'card') {
@@ -395,6 +406,8 @@ function openModal(kind) {
 }
 function closeModal() {
   modal.classList.remove('open');
+  modal.style.height = '';
+  modal.style.top = '';
   document.body.style.overflow = '';
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   document.querySelectorAll('.sheet form').forEach((f) => f.reset());
@@ -640,7 +653,8 @@ $('offer-pct').oninput=$('offer-max-cb').oninput=updateOfferMaxOrder;
 $('cb-offer-form').onsubmit=(e)=>{
   e.preventDefault();
   const pct=+$('offer-pct').value,maxCashback=+$('offer-max-cb').value;
-  cbOffers.push({id:Date.now(),name:$('offer-name').value.trim(),bank:+$('offer-bank').value,pct,minAmount:+$('offer-min-amount').value||0,maxCashback,maxOrder:Math.floor(maxCashback/(pct/100)),date:$('offer-date').value});
+  const dateFrom=$('offer-date-from').value,dateTo=$('offer-date-to').value||dateFrom;
+  cbOffers.push({id:Date.now(),name:$('offer-name').value.trim(),bank:+$('offer-bank').value,pct,minAmount:+$('offer-min-amount').value||0,maxCashback,maxOrder:Math.floor(maxCashback/(pct/100)),dateFrom,dateTo});
   save();renderCashback();closeModal();
 };
 
@@ -1041,7 +1055,7 @@ function renderHistory() {
         <div class="swipe-actions"></div>
         <div class="li tap" data-id="${t.id}">
           <div class="ic">${tr ? svgIcon('transfer') : catIcon(t.type, t.category)}</div>
-          <div class="grow"><div class="name">${tr ? 'Перевод' : esc(t.category)}</div>${t.note ? `<div class="note note-comment">${svgIcon('message')}<span>${esc(t.note)}</span></div>` : ''}${tr ? `<div class="note note-account">${from?renderIcon(from.icon):''}<span>${from ? esc(from.name) : '—'}</span> → ${to?renderIcon(to.icon):''}<span>${to ? esc(to.name) : '—'}</span></div>` : acc ? `<div class="note note-account">${renderIcon(acc.icon)}<span>${esc(acc.name)}</span></div>` : ''}</div>
+          <div class="grow"><div class="name">${tr ? 'Перевод' : esc(t.category)}</div>${tr ? `<div class="note note-account">${from?renderIcon(from.icon):''}<span>${from ? esc(from.name) : '—'}</span> → ${to?renderIcon(to.icon):''}<span>${to ? esc(to.name) : '—'}</span></div>` : acc ? `<div class="note note-account">${renderIcon(acc.icon)}<span>${esc(acc.name)}</span></div>` : ''}${t.note ? `<div class="note note-comment">${svgIcon('message')}<span>${esc(t.note)}</span></div>` : ''}</div>
           <div class="amt-wrap"><div class="amt ${tr ? '' : inc ? 'in' : 'out'}">${tr ? '' : inc ? '+' : '−'}${money(t.amount, txCurrency(t))}</div>${t.cashback?.amount>0?`<div class="tx-cashback-note">Кэшбэк · ${money(t.cashback.amount,txCurrency(t))}</div>`:''}</div>
         </div>
       </div>`;
@@ -1138,8 +1152,18 @@ function renderCashback() {
   if(cbMode==='offers'){
     const specialTxs=txs.filter(t=>t.type==='expense'&&t.cashback?.special&&t.date.startsWith(m));
     const specialTotal=specialTxs.reduce((s,t)=>s+(+t.cashback.amount||0),0);
-    $('cb-count').textContent=cbOffers.filter(o=>!o.date||o.date>=todayISO()).length;
-    $('card-list').innerHTML=`<div class="cb-offer-total">Получено по спец акциям в этом месяце <b>${money(specialTotal)}</b></div>`+(cbOffers.length?cbOffers.map(o=>{const b=cards.find(c=>c.id===o.bank);return `<article class="cb-offer"><div class="cb-bank-head"><span class="cb-logo" style="--brand:${esc(b?.logo?.color||'#806f54')}">${esc(b?.logo?.mark||'Б')}</span><strong>${esc(o.name)}</strong><button class="cb-offer-del" data-offer="${o.id}" aria-label="Удалить акцию">×</button></div><div class="cb-offer-meta">${esc(b?.name||'Банк')} · ${o.pct}% · максимум ${money(o.maxCashback)} кэшбэка</div><div class="cb-offer-order">Заказ от ${money(o.minAmount||0)} до <b>${money(o.maxOrder)}</b></div><div class="cb-offer-meta">${o.date?`До ${formatDate(o.date)}`:'Без срока'}</div></article>`}).join(''):'<div class="cb-empty">Специальных акций пока нет</div>');
+    const sortedOffers=[...cbOffers].sort((a,b)=>{
+      const ad=a.dateTo||'9999-12-31',bd=b.dateTo||'9999-12-31';
+      return ad.localeCompare(bd)||b.id-a.id;
+    });
+    const activeOffers=sortedOffers.filter(o=>!o.dateTo||o.dateTo>=todayISO());
+    $('cb-count').textContent=activeOffers.length;
+    const periodText=(o)=>{
+      if(!o.dateTo)return 'Без срока';
+      if(o.dateFrom===o.dateTo)return `Только ${formatDate(o.dateTo)}`;
+      return `С ${formatDate(o.dateFrom||o.dateTo)} по ${formatDate(o.dateTo)}`;
+    };
+    $('card-list').innerHTML=`<div class="cb-offer-total">Получено по спец акциям в этом месяце <b>${money(specialTotal)}</b></div>`+(sortedOffers.length?sortedOffers.map(o=>{const b=cards.find(c=>c.id===o.bank);return `<article class="cb-offer ${o.dateTo&&o.dateTo<todayISO()?'expired':''}"><div class="cb-bank-head"><span class="cb-logo" style="--brand:${esc(b?.logo?.color||'#806f54')}">${esc(b?.logo?.mark||'Б')}</span><strong>${esc(o.name)}</strong><button class="cb-offer-del" data-offer="${o.id}" aria-label="Удалить акцию">×</button></div><div class="cb-offer-meta">${esc(b?.name||'Банк')} · ${o.pct}% · максимум ${money(o.maxCashback)} кэшбэка</div><div class="cb-offer-order">Заказ от ${money(o.minAmount||0)} до <b>${money(o.maxOrder)}</b></div><div class="cb-offer-meta">${periodText(o)}</div></article>`}).join(''):'<div class="cb-empty">Специальных акций пока нет</div>');
     $('card-list').onclick=e=>{const b=e.target.closest('[data-offer]');if(b&&confirm('Удалить акцию?')){cbOffers=cbOffers.filter(o=>o.id!==+b.dataset.offer);save();renderCashback();}};
     return;
   }
