@@ -132,6 +132,10 @@ body {
 .card.list .swipe:first-child, .card.list .sec + .swipe { border-top: none; }
 .row:active, .li:active { background: rgba(120, 120, 128, .12); }
 .sec { padding: 12px 16px 6px; color: var(--muted); font-size: 13px; }
+.sec.accordion { display:flex; align-items:center; justify-content:space-between; width:100%; border:0; background:transparent; font:inherit; color:var(--text); font-size:15px; padding:14px 16px; cursor:pointer; }
+.sec.accordion span { color:var(--muted); font-size:18px; }
+.cat-group { display:none; }
+.cat-group.open { display:block; }
 .grow { flex: 1; min-width: 0; }
 .name { font-size: 16px; }
 .note { font-size: 13px; color: var(--muted); margin-top: 2px; }
@@ -407,6 +411,8 @@ body::before, body::after { display: none !important; animation: none !important
 .cb-bank-row { display:flex; align-items:center; gap:12px; width:100%; min-height:60px; padding:12px 16px; border:0; border-bottom:1px solid var(--sep); color:var(--text); background:transparent; text-align:left; font:inherit; font-size:16px; }
 .cb-bank-row:last-child { border-bottom:0; }
 .cb-bank-row strong { flex:1; }
+.cb-bank-info { display:flex; flex-direction:column; flex:1; gap:2px; }
+.cb-condition { color:var(--muted); font-size:12px; }
 .cb-logo { display:grid; place-items:center; flex:none; width:34px; height:34px; border-radius:10px; color:white; background:var(--brand); font-size:13px; font-weight:800; }
 .cb-rate { padding:5px 10px; border-radius:14px; color:var(--text); background:var(--field); font-size:14px; }
 .cb-bank { padding:12px 16px; border-bottom:1px solid var(--sep); }

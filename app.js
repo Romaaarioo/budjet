@@ -173,6 +173,7 @@ if (migrated || !localStorage.getItem('fin_categories')) save();
 const fmtSign = (n) => (n >= 0 ? '+' : '−') + fmt.format(Math.abs(n));
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const month = () => todayISO().slice(0, 7);
+const localISODate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const catIcon = (type, name) => {
   const c = cats[type].find((x) => x.name === name);
   return c ? renderIcon(c.icon) : svgIcon('sparkle');
@@ -497,7 +498,7 @@ function fillTxCashback(bankId='', slotIndex=null) {
 function fillTxSlots(selected=null) {
   const bank=cards.find(c=>c.id===+$('tx-cb-bank').value);
   const slots=(bank?.slots||[]).map((s,i)=>({...s,i})).filter(s=>(+s.pct||0)>0);
-  const specialOpt=bank?`<option value="${SPECIAL_SLOT_VALUE}">Спец акция · укажи сумму</option>`:'';
+  const specialOpt=bank?`<option value="${SPECIAL_SLOT_VALUE}">Спец акция</option>`:'';
   $('tx-cb-slot').innerHTML=slots.map(s=>`<option value="${s.i}">${esc(s.cat)} · ${s.pct}%${s.condition?` — ${esc(s.condition)}`:''}</option>`).join('')+specialOpt;
   $('tx-cb-cat-wrap').hidden=!bank;
   const hasSelected=slots.some(s=>String(s.i)===String(selected))||selected===SPECIAL_SLOT_VALUE;
@@ -1124,10 +1125,10 @@ function renderCashback() {
   $('cb-section-name').textContent=cbMode==='offers'?'Специальные акции':cbMode==='banks'?'Все банки':cbFilter;
   let shown=cards;
   if(cbMode==='categories'){
-    shown=cards.filter(c=>(c.slots||[]).some(s=>(+s.pct||0)>0&&(cbFilter==='Всё'||s.cat===cbFilter)))
+    shown=cards.filter(c=>(c.slots||[]).some(s=>(+s.pct||0)>0&&s.cat===cbFilter))
       .map(c=>{
         const slots=c.slots||[{cat:c.cat||'Всё',pct:c.pct||0}];
-        const relevant=cbFilter==='Всё'?slots.filter(s=>+s.pct>0):slots.filter(s=>s.cat===cbFilter&&+s.pct>0);
+        const relevant=slots.filter(s=>s.cat===cbFilter&&+s.pct>0);
         const best=relevant.reduce((m,s)=>Math.max(m,+s.pct||0),0);
         return {c,best};
       }).sort((a,b)=>b.best-a.best).map(x=>x.c);
@@ -1144,20 +1145,22 @@ function renderCashback() {
   }
   $('card-list').innerHTML=shown.map(c=>{
     const slots=c.slots||[{cat:c.cat||'Всё',pct:c.pct||0}];
-    const relevant=cbMode==='categories'&&cbFilter!=='Всё'?slots.filter(s=>s.cat===cbFilter):slots;
+    const relevant=cbMode==='categories'?slots.filter(s=>s.cat===cbFilter&&+s.pct>0):slots;
     const best=relevant.reduce((m,s)=>Math.max(m,+s.pct||0),0);
+    const bestSlot=relevant.find(s=>+s.pct===best);
     const logo=`<span class="cb-logo" style="--brand:${esc(c.logo?.color||'#53627b')}">${esc(c.logo?.mark||c.name.slice(0,2))}</span>`;
     if(cbMode==='banks'){
       const used=cashbackUsed(c),limit=c.monthlyLimit,progress=limit?Math.min(100,used/limit*100):0;
       return `<article class="cb-bank"><div class="cb-bank-head">${logo}<strong>${esc(c.name)}</strong><button class="cb-add-slot" data-bank="${c.id}" aria-label="Добавить слот">＋</button></div>${limit?`<div class="cb-limit"><div class="cb-limit-label"><span>Лимит за месяц</span><b>осталось ${num(Math.max(0,limit-used))} из ${num(limit)} ₽</b></div><div class="cb-limit-track"><i style="width:${progress}%"></i></div></div>`:`<div class="cb-limit-label">Месячный лимит не задан</div>`}<div class="cb-slots">${slots.map((s,i)=>`<button class="cb-slot" data-bank="${c.id}" data-slot="${i}"><span>${esc(s.cat||'Выбрать категорию')}${s.condition?` · ${esc(s.condition)}`:''}</span><b>${s.pct||0}%</b></button>`).join('')}</div></article>`;
     }
-    return `<button class="cb-bank-row" data-bank="${c.id}">${logo}<strong>${esc(c.name)}</strong><b class="cb-rate">${best}%</b></button>`;
+    return `<button class="cb-bank-row" data-bank="${c.id}">${logo}<div class="cb-bank-info"><strong>${esc(c.name)}</strong>${bestSlot?.condition?`<span class="cb-condition">${esc(bestSlot.condition)}</span>`:''}</div><b class="cb-rate">${best}%</b></button>`;
   }).join('')||'<div class="cb-empty">Пока нет банков с этой категорией</div>';
   $('card-list').onclick=e=>{const b=e.target.closest('[data-bank]');if(!b)return;const c=cards.find(x=>x.id===+b.dataset.bank);if(!c)return;if(b.dataset.slot!=null){cbSlotIndex=+b.dataset.slot;editingCard=c.id;openModal('card');$('card-form').querySelector('.h2').textContent=`Слот ${cbSlotIndex+1} · ${c.name}`;$('cb-card-cat').value=c.slots[cbSlotIndex].cat;$('cb-card-pct').value=c.slots[cbSlotIndex].pct;$('cb-card-condition').value=c.slots[cbSlotIndex].condition||'';return;}if(cbMode==='banks'){cbSlotIndex=null;editingCard=c.id;openModal('card');$('card-form').querySelector('.h2').textContent=`Новый слот · ${c.name}`;return;}cbFilter='Всё';cbMode='banks';document.querySelector('[data-cb-view="banks"]').click();};
 }
 
 // ---------- Рендер: КАТЕГОРИИ и АВТОПЛАТЕЖИ ----------
 let orderingCats = false;
+let catExpanded = { expense: false, income: false };
 $('cat-order-mode').onclick = () => { orderingCats = !orderingCats; renderCats(); };
 function renderCats() {
   const row = (c, t) => `
@@ -1168,11 +1171,20 @@ function renderCats() {
         <span class="account-order-controls"><button type="button" data-cmove="-1" aria-label="Выше">↑</button><button type="button" data-cmove="1" aria-label="Ниже">↓</button></span>
       </div>
     </div>`;
+  const expanded = orderingCats ? { expense: true, income: true } : catExpanded;
   $('cat-list').classList.toggle('ordering', orderingCats);
   $('cat-order-mode').textContent = orderingCats ? 'Готово' : 'Изменить порядок';
-  $('cat-list').innerHTML =
-    '<div class="sec">Расходы</div>' + cats.expense.map((c) => row(c, 'expense')).join('') +
-    '<div class="sec">Доходы</div>' + cats.income.map((c) => row(c, 'income')).join('');
+  const section = (type, title) => {
+    const isExpanded = !!expanded[type];
+    return `<button type="button" class="sec accordion ${isExpanded ? 'on' : ''}" data-cat-sec="${type}">${title}<span>${isExpanded ? '−' : '+'}</span></button>` +
+      `<div class="cat-group ${isExpanded ? 'open' : ''}" data-cat-group="${type}">${cats[type].map((c) => row(c, type)).join('')}</div>`;
+  };
+  $('cat-list').innerHTML = section('expense', 'Расходы') + section('income', 'Доходы');
+  $('cat-list').querySelectorAll('[data-cat-sec]').forEach((b) => (b.onclick = () => {
+    if (orderingCats) return;
+    catExpanded[b.dataset.catSec] = !catExpanded[b.dataset.catSec];
+    renderCats();
+  }));
   $('cat-list').querySelectorAll('.swipe').forEach((el) => {
     const li = el.querySelector('.li'), name = li.dataset.n, type = li.dataset.t;
     bindSwipe(el, [
@@ -1208,7 +1220,7 @@ function renderPays() {
       <div class="swipe-actions"></div>
       <div class="li" data-id="${p.id}">
         <div class="ic">${svgIcon('refresh')}</div>
-        <div class="grow"><div class="name">${esc(p.name)}</div><div class="note">${formatDate(next(p).toISOString().slice(0,10))} · ${money(p.amount,(accounts.find(a=>a.id==p.account)||accounts[0]||{}).currency||'RUB')} · ${esc(accName(p.account))}${p.category?' · '+esc(p.category):''}</div></div>
+        <div class="grow"><div class="name">${esc(p.name)}</div><div class="note">${formatDate(localISODate(next(p)))} · ${money(p.amount,(accounts.find(a=>a.id==p.account)||accounts[0]||{}).currency||'RUB')} · ${esc(accName(p.account))}${p.category?' · '+esc(p.category):''}</div></div>
       </div>
     </div>`).join('') : '<div class="empty">Автоплатежей нет. Нажми «Добавить», чтобы настроить</div>');
   $('autopay-list').querySelectorAll('.swipe').forEach((el) => {
