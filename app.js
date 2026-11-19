@@ -326,16 +326,24 @@ function runPays() {
 
 // ---------- Модальное окно ----------
 const modal = $('modal');
+const sheetEl = document.querySelector('.sheet');
 let modalScrollY = 0;
-function fitSheetToViewport() {
-  if (!modal.classList.contains('open')) return;
+function sheetKeyboardScroll(target) {
+  if (!modal.classList.contains('open') || !target) return;
   const vv = window.visualViewport;
-  if (!vv) return;
-  modal.style.height = `${vv.height}px`;
-  modal.style.top = `${vv.offsetTop}px`;
+  const visibleBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+  const rect = target.getBoundingClientRect();
+  const pad = 16;
+  if (rect.bottom > visibleBottom - pad) {
+    const overscroll = rect.bottom - visibleBottom + pad;
+    sheetEl.scrollTo({ top: sheetEl.scrollTop + overscroll, behavior: 'smooth' });
+  }
 }
-window.visualViewport?.addEventListener('resize', fitSheetToViewport);
-window.visualViewport?.addEventListener('scroll', fitSheetToViewport);
+sheetEl.addEventListener('focusin', (e) => {
+  if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) {
+    requestAnimationFrame(() => sheetKeyboardScroll(e.target));
+  }
+});
 let editing = null;      // id редактируемой инвестиции
 let editingTx = null;    // id редактируемой операции
 let editingAcc = null;   // id редактируемого счёта
@@ -351,9 +359,8 @@ function openModal(kind) {
   modalScrollY = window.scrollY;
   ['tx', 'inv', 'cat', 'pay', 'acc', 'card', 'cb', 'budget', 'goal', 'cb-offer', 'cbcat'].forEach((k) => ($(`${k}-form`).hidden = k !== kind));
   modal.classList.add('open');
-  document.querySelector('.sheet').scrollTop = 0;
+  sheetEl.scrollTop = 0;
   document.body.style.overflow = 'hidden'; // фон не скроллится, пока открыто окно
-  fitSheetToViewport();
   if (kind === 'tx' && editingTx === null) {
     setSeg($('tx-form'), 'expense');
     $('tx-amount').value = ''; $('tx-note').value = '';
@@ -382,8 +389,17 @@ function openModal(kind) {
   if (kind === 'cb') { $('cb-date').value = todayISO(); fillCbCards(); }
   if (kind === 'cb-offer') {
     $('offer-bank').innerHTML=cards.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
-    $('offer-date-from').value=todayISO();
-    $('offer-date-to').value=todayISO();
+    if(editingOffer){
+      const o=cbOffers.find(x=>x.id===editingOffer);
+      $('offer-name').value=o.name;$('offer-bank').value=o.bank;$('offer-pct').value=o.pct;
+      $('offer-min-amount').value=o.minAmount||0;$('offer-max-cb').value=o.maxCashback;
+      $('offer-date-from').value=o.dateFrom||todayISO();$('offer-date-to').value=o.dateTo||todayISO();
+      $('cb-offer-form').querySelector('.h2').textContent='Редактировать акцию';
+    }else{
+      $('offer-name').value='';$('offer-pct').value='';$('offer-min-amount').value=0;$('offer-max-cb').value='';
+      $('offer-date-from').value=todayISO();$('offer-date-to').value=todayISO();
+      $('cb-offer-form').querySelector('.h2').textContent='Специальная акция';
+    }
     updateOfferMaxOrder();
   }
   if (kind === 'card') {
@@ -406,8 +422,6 @@ function openModal(kind) {
 }
 function closeModal() {
   modal.classList.remove('open');
-  modal.style.height = '';
-  modal.style.top = '';
   document.body.style.overflow = '';
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   document.querySelectorAll('.sheet form').forEach((f) => f.reset());
@@ -429,7 +443,6 @@ modal.onclick = (e) => { if (e.target === modal) closeModal(); };
 document.querySelectorAll('.cancel').forEach((b) => (b.onclick = closeModal));
 
 // Шторка: закрытие перетягиванием вниз (за верхнюю часть окна)
-const sheetEl = document.querySelector('.sheet');
 let dragY = null, lastDy = 0;
 sheetEl.addEventListener('touchstart', (e) => {
   lastDy = 0;
@@ -654,7 +667,9 @@ $('cb-offer-form').onsubmit=(e)=>{
   e.preventDefault();
   const pct=+$('offer-pct').value,maxCashback=+$('offer-max-cb').value;
   const dateFrom=$('offer-date-from').value,dateTo=$('offer-date-to').value||dateFrom;
-  cbOffers.push({id:Date.now(),name:$('offer-name').value.trim(),bank:+$('offer-bank').value,pct,minAmount:+$('offer-min-amount').value||0,maxCashback,maxOrder:Math.floor(maxCashback/(pct/100)),dateFrom,dateTo});
+  const d={name:$('offer-name').value.trim(),bank:+$('offer-bank').value,pct,minAmount:+$('offer-min-amount').value||0,maxCashback,maxOrder:Math.floor(maxCashback/(pct/100)),dateFrom,dateTo};
+  if(editingOffer){Object.assign(cbOffers.find(o=>o.id===editingOffer),d);}
+  else cbOffers.push({id:Date.now(),...d});
   save();renderCashback();closeModal();
 };
 
@@ -1114,9 +1129,11 @@ function renderInvestments() {
 }
 
 // ---------- Рендер: КЭШБЭК ----------
-let cbMode='categories', cbFilter='Всё', cbSlotIndex=null;
+let cbMode='categories', cbFilter='Всё', cbSlotIndex=null, orderingBanks=false;
+$('cb-bank-order').onclick=()=>{orderingBanks=!orderingBanks;renderCashback();};
 document.querySelectorAll('[data-cb-view]').forEach(b=>b.onclick=()=>{
   cbMode=b.dataset.cbView;
+  orderingBanks=false;
   document.querySelectorAll('[data-cb-view]').forEach(x=>x.classList.toggle('on',x===b));
   renderCashback();
 });
@@ -1136,6 +1153,8 @@ function renderCashback() {
   $('add-card').hidden=cbMode!=='banks';
   $('add-cb-cat').hidden=cbMode!=='banks';
   $('add-cb-offer').hidden=cbMode!=='offers';
+  $('cb-bank-order').hidden=cbMode!=='banks';
+  $('cb-bank-order').textContent=orderingBanks?'Готово':'Изменить порядок';
   $('cb-section-name').textContent=cbMode==='offers'?'Специальные акции':cbMode==='banks'?'Все банки':cbFilter;
   let shown=cards;
   if(cbMode==='categories'){
@@ -1163,8 +1182,13 @@ function renderCashback() {
       if(o.dateFrom===o.dateTo)return `Только ${formatDate(o.dateTo)}`;
       return `С ${formatDate(o.dateFrom||o.dateTo)} по ${formatDate(o.dateTo)}`;
     };
-    $('card-list').innerHTML=`<div class="cb-offer-total">Получено по спец акциям в этом месяце <b>${money(specialTotal)}</b></div>`+(sortedOffers.length?sortedOffers.map(o=>{const b=cards.find(c=>c.id===o.bank);return `<article class="cb-offer ${o.dateTo&&o.dateTo<todayISO()?'expired':''}"><div class="cb-bank-head"><span class="cb-logo" style="--brand:${esc(b?.logo?.color||'#806f54')}">${esc(b?.logo?.mark||'Б')}</span><strong>${esc(o.name)}</strong><button class="cb-offer-del" data-offer="${o.id}" aria-label="Удалить акцию">×</button></div><div class="cb-offer-meta">${esc(b?.name||'Банк')} · ${o.pct}% · максимум ${money(o.maxCashback)} кэшбэка</div><div class="cb-offer-order">Заказ от ${money(o.minAmount||0)} до <b>${money(o.maxOrder)}</b></div><div class="cb-offer-meta">${periodText(o)}</div></article>`}).join(''):'<div class="cb-empty">Специальных акций пока нет</div>');
-    $('card-list').onclick=e=>{const b=e.target.closest('[data-offer]');if(b&&confirm('Удалить акцию?')){cbOffers=cbOffers.filter(o=>o.id!==+b.dataset.offer);save();renderCashback();}};
+    $('card-list').innerHTML=`<div class="cb-offer-total">Получено по спец акциям в этом месяце <b>${money(specialTotal)}</b></div>`+(sortedOffers.length?sortedOffers.map(o=>{const b=cards.find(c=>c.id===o.bank);return `<article class="cb-offer ${o.dateTo&&o.dateTo<todayISO()?'expired':''}" data-offer="${o.id}"><div class="cb-bank-head"><span class="cb-logo" style="--brand:${esc(b?.logo?.color||'#806f54')}">${esc(b?.logo?.mark||'Б')}</span><strong>${esc(o.name)}</strong><button class="cb-offer-del" data-offer="${o.id}" aria-label="Удалить акцию">×</button></div><div class="cb-offer-meta">${esc(b?.name||'Банк')} · ${o.pct}% · максимум ${money(o.maxCashback)} кэшбэка</div><div class="cb-offer-order">Заказ от ${money(o.minAmount||0)} до <b>${money(o.maxOrder)}</b></div><div class="cb-offer-meta">${periodText(o)}</div></article>`}).join(''):'<div class="cb-empty">Специальных акций пока нет</div>');
+    $('card-list').onclick=e=>{
+      const del=e.target.closest('.cb-offer-del');
+      if(del){if(confirm('Удалить акцию?')){cbOffers=cbOffers.filter(o=>o.id!==+del.dataset.offer);save();renderCashback();}return;}
+      const art=e.target.closest('.cb-offer');
+      if(art){editingOffer=+art.dataset.offer;openModal('cb-offer');}
+    };
     return;
   }
   $('card-list').innerHTML=shown.map(c=>{
@@ -1175,11 +1199,25 @@ function renderCashback() {
     const logo=`<span class="cb-logo" style="--brand:${esc(c.logo?.color||'#53627b')}">${esc(c.logo?.mark||c.name.slice(0,2))}</span>`;
     if(cbMode==='banks'){
       const used=cashbackUsed(c),limit=c.monthlyLimit,progress=limit?Math.min(100,used/limit*100):0;
-      return `<article class="cb-bank"><div class="cb-bank-head">${logo}<strong>${esc(c.name)}</strong><button class="cb-add-slot" data-bank="${c.id}" aria-label="Добавить слот">＋</button></div>${limit?`<div class="cb-limit"><div class="cb-limit-label"><span>Лимит за месяц</span><b>осталось ${num(Math.max(0,limit-used))} из ${num(limit)} ₽</b></div><div class="cb-limit-track"><i style="width:${progress}%"></i></div></div>`:`<div class="cb-limit-label">Месячный лимит не задан</div>`}<div class="cb-slots">${slots.map((s,i)=>`<button class="cb-slot" data-bank="${c.id}" data-slot="${i}"><span>${esc(s.cat||'Выбрать категорию')}${s.condition?` · ${esc(s.condition)}`:''}</span><b>${s.pct||0}%</b></button>`).join('')}</div></article>`;
+      const orderControls=orderingBanks?`<span class="account-order-controls"><button type="button" data-bmove="-1" aria-label="Выше">↑</button><button type="button" data-bmove="1" aria-label="Ниже">↓</button></span>`:'';
+      return `<article class="cb-bank ${orderingBanks?'ordering':''}" data-bid="${c.id}"><div class="cb-bank-head">${logo}<strong>${esc(c.name)}</strong>${orderControls}<button class="cb-add-slot" data-bank="${c.id}" aria-label="Добавить слот">＋</button></div>${limit?`<div class="cb-limit"><div class="cb-limit-label"><span>Лимит за месяц</span><b>осталось ${num(Math.max(0,limit-used))} из ${num(limit)} ₽</b></div><div class="cb-limit-track"><i style="width:${progress}%"></i></div></div>`:`<div class="cb-limit-label">Месячный лимит не задан</div>`}<div class="cb-slots">${slots.map((s,i)=>`<button class="cb-slot" data-bank="${c.id}" data-slot="${i}"><span>${esc(s.cat||'Выбрать категорию')}${s.condition?` · ${esc(s.condition)}`:''}</span><b>${s.pct||0}%</b></button>`).join('')}</div></article>`;
     }
     return `<button class="cb-bank-row" data-bank="${c.id}">${logo}<div class="cb-bank-info"><strong>${esc(c.name)}</strong>${bestSlot?.condition?`<span class="cb-condition">${esc(bestSlot.condition)}</span>`:''}</div><b class="cb-rate">${best}%</b></button>`;
   }).join('')||'<div class="cb-empty">Пока нет банков с этой категорией</div>';
-  $('card-list').onclick=e=>{const b=e.target.closest('[data-bank]');if(!b)return;const c=cards.find(x=>x.id===+b.dataset.bank);if(!c)return;if(b.dataset.slot!=null){cbSlotIndex=+b.dataset.slot;editingCard=c.id;openModal('card');$('card-form').querySelector('.h2').textContent=`Слот ${cbSlotIndex+1} · ${c.name}`;$('cb-card-cat').value=c.slots[cbSlotIndex].cat;$('cb-card-pct').value=c.slots[cbSlotIndex].pct;$('cb-card-condition').value=c.slots[cbSlotIndex].condition||'';return;}if(cbMode==='banks'){cbSlotIndex=null;editingCard=c.id;openModal('card');$('card-form').querySelector('.h2').textContent=`Новый слот · ${c.name}`;return;}cbFilter='Всё';cbMode='banks';document.querySelector('[data-cb-view="banks"]').click();};
+  $('card-list').onclick=e=>{
+    const move=e.target.closest('[data-bmove]');
+    if(move){
+      e.stopPropagation();
+      const art=move.closest('.cb-bank');
+      const id=+art.dataset.bid;
+      const i=cards.findIndex(c=>c.id===id);
+      const j=i+(+move.dataset.bmove);
+      if(j<0||j>=cards.length)return;
+      [cards[i],cards[j]]=[cards[j],cards[i]];
+      save();renderCashback();
+      return;
+    }
+    const b=e.target.closest('[data-bank]');if(!b)return;const c=cards.find(x=>x.id===+b.dataset.bank);if(!c)return;if(b.dataset.slot!=null){cbSlotIndex=+b.dataset.slot;editingCard=c.id;openModal('card');$('card-form').querySelector('.h2').textContent=`Слот ${cbSlotIndex+1} · ${c.name}`;$('cb-card-cat').value=c.slots[cbSlotIndex].cat;$('cb-card-pct').value=c.slots[cbSlotIndex].pct;$('cb-card-condition').value=c.slots[cbSlotIndex].condition||'';return;}if(cbMode==='banks'){cbSlotIndex=null;editingCard=c.id;openModal('card');$('card-form').querySelector('.h2').textContent=`Новый слот · ${c.name}`;return;}cbFilter='Всё';cbMode='banks';document.querySelector('[data-cb-view="banks"]').click();};
 }
 
 // ---------- Рендер: КАТЕГОРИИ и АВТОПЛАТЕЖИ ----------
