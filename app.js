@@ -6,6 +6,7 @@ const $ = (id) => document.getElementById(id);
 const fmt = { format:n => new Intl.NumberFormat('ru-RU',{style:'currency',currency:'RUB',maximumFractionDigits:Number.isInteger(+n)?0:2,minimumFractionDigits:Number.isInteger(+n)?0:2}).format(n) };
 const money = (n, currency = 'RUB') => new Intl.NumberFormat('ru-RU',{style:'currency',currency,maximumFractionDigits:Number.isInteger(+n)?0:2,minimumFractionDigits:Number.isInteger(+n)?0:2}).format(n);
 const num = (n) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(n);
+const parseNum = (v) => { const n = parseFloat(String(v).replace(',', '.')); return Number.isFinite(n) ? n : 0; };
 const txCurrency = (t) => t.currency || (accounts.find(a=>a.id===(t.account||t.from))||{}).currency || 'RUB';
 const esc = (s) => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML.replace(/"/g, '&quot;'); };
 const load = (k, f) => { try { return JSON.parse(localStorage.getItem(k)) ?? f; } catch { return f; } };
@@ -205,11 +206,11 @@ function cashbackQuote(amount, bank, slot, excludeId = null) {
 let openSwipe = null;
 function closeSwipe(el) {
   delete el.dataset.open;
-  el.querySelector('.li, .card').style.transform = 'translateX(0)';
+  el.querySelector('.li, .card, .cb-offer').style.transform = 'translateX(0)';
   if (openSwipe === el) openSwipe = null;
 }
 function bindSwipe(el, actions, onTap) {
-  const content = el.querySelector('.li, .card');
+  const content = el.querySelector('.li, .card, .cb-offer');
   const w = actions.length * 52;
 
   el.querySelector('.swipe-actions').innerHTML = actions.map((a, i) =>
@@ -328,15 +329,43 @@ function runPays() {
 const modal = $('modal');
 const sheetEl = document.querySelector('.sheet');
 let modalScrollY = 0;
+function fitSheetToViewport() {
+  if (!modal.classList.contains('open')) return;
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const kb = window.innerHeight - (vv.height + vv.offsetTop);
+  if (kb > 80) {
+    modal.style.top = `${Math.round(vv.offsetTop)}px`;
+    modal.style.height = `${Math.round(vv.height)}px`;
+    sheetEl.style.maxHeight = '100%';
+  } else {
+    modal.style.top = '';
+    modal.style.height = '';
+    sheetEl.style.maxHeight = '';
+  }
+}
+window.visualViewport?.addEventListener('resize', () => {
+  fitSheetToViewport();
+  const ae = document.activeElement;
+  if (ae && sheetEl.contains(ae) && ['INPUT', 'SELECT', 'TEXTAREA'].includes(ae.tagName)) {
+    requestAnimationFrame(() => sheetKeyboardScroll(ae));
+  }
+});
+window.visualViewport?.addEventListener('scroll', fitSheetToViewport);
 function sheetKeyboardScroll(target) {
   if (!modal.classList.contains('open') || !target) return;
   const vv = window.visualViewport;
+  const visibleTop = vv ? vv.offsetTop : 0;
   const visibleBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
   const rect = target.getBoundingClientRect();
   const pad = 16;
+  if (rect.top < visibleTop + 8) {
+    sheetEl.scrollTop -= visibleTop + 8 - rect.top;
+    return;
+  }
   if (rect.bottom > visibleBottom - pad) {
     const overscroll = rect.bottom - visibleBottom + pad;
-    sheetEl.scrollTo({ top: sheetEl.scrollTop + overscroll, behavior: 'smooth' });
+    sheetEl.scrollTop += overscroll;
   }
 }
 sheetEl.addEventListener('focusin', (e) => {
@@ -357,10 +386,11 @@ let editingOffer=null;
 
 function openModal(kind) {
   modalScrollY = window.scrollY;
-  ['tx', 'inv', 'cat', 'pay', 'acc', 'card', 'cb', 'budget', 'goal', 'cb-offer', 'cbcat'].forEach((k) => ($(`${k}-form`).hidden = k !== kind));
+  ['tx', 'inv', 'cat', 'pay', 'acc', 'card', 'cb', 'budget', 'goal', 'cb-offer', 'cbcat', 'an-list'].forEach((k) => ($(`${k}-form`).hidden = k !== kind));
   modal.classList.add('open');
   sheetEl.scrollTop = 0;
   document.body.style.overflow = 'hidden'; // фон не скроллится, пока открыто окно
+  fitSheetToViewport();
   if (kind === 'tx' && editingTx === null) {
     setSeg($('tx-form'), 'expense');
     $('tx-amount').value = ''; $('tx-note').value = '';
@@ -422,6 +452,9 @@ function openModal(kind) {
 }
 function closeModal() {
   modal.classList.remove('open');
+  modal.style.top = '';
+  modal.style.height = '';
+  sheetEl.style.maxHeight = '';
   document.body.style.overflow = '';
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   document.querySelectorAll('.sheet form').forEach((f) => f.reset());
@@ -539,9 +572,10 @@ function updateTxCashback() {
   const slot=isSpecial?null:bank?.slots?.[+slotVal];
   const active=bank&&(isSpecial||slot&&+slot.pct>0);
   const q=cashbackQuote(+$('tx-amount').value,bank,slot,editingTx);
-  const manualVal=+$('tx-cb-amount').value||0;
+  const cbInput=$('tx-cb-amount');
+  const manualVal=parseNum(cbInput.value);
   const value=isSpecial?(cbManualOverride?manualVal:0):Math.min(cbManualOverride?manualVal:q.value,q.remaining);
-  if(!isSpecial||cbManualOverride)$('tx-cb-amount').value=value||'';
+  if((!isSpecial||cbManualOverride)&&document.activeElement!==cbInput)cbInput.value=value||'';
   $('tx-cb-amount-wrap').hidden=!active;
   $('tx-cb-progress-wrap').hidden=!bank||bank.monthlyLimit==null;
   if(bank?.monthlyLimit>0)$('tx-cb-progress').style.width=`${Math.min(100,Math.max(0,(bank.monthlyLimit-q.remaining+value)/bank.monthlyLimit*100))}%`;
@@ -589,11 +623,14 @@ $('tx-form').onsubmit = (e) => {
     d = { type, amount: +$('tx-amount').value, from, to, cashback:null, note: $('tx-note').value.trim(), date: $('tx-date').value || todayISO() };
   } else {
     const bank=cards.find(c=>c.id===+$('tx-cb-bank').value),slotVal=$('tx-cb-slot').value,isSpecial=slotVal===SPECIAL_SLOT_VALUE,slotIndex=isSpecial?null:+slotVal,slot=isSpecial?null:bank?.slots?.[slotIndex];
+    const q=cashbackQuote(+$('tx-amount').value,bank,slot,editingTx);
+    const rawCb=parseNum($('tx-cb-amount').value);
+    const cbAmount=isSpecial?rawCb:Math.min(rawCb,q.remaining);
     d = {
       type, amount: +$('tx-amount').value,
       category: $('tx-category').value, account: +$('tx-account').value,
       currency: accounts.find(a=>a.id===+$('tx-account').value)?.currency || 'RUB',
-      cashback: type==='expense'&&bank&&(isSpecial||(slot&&+slot.pct>0))?{bankId:bank.id,slotIndex,category:isSpecial?'Спец акция':slot.cat,percent:isSpecial?0:+slot.pct,amount:+$('tx-cb-amount').value||0,manual:cbManualOverride,special:isSpecial}:null,
+      cashback: type==='expense'&&bank&&(isSpecial||(slot&&+slot.pct>0))?{bankId:bank.id,slotIndex,category:isSpecial?'Спец акция':slot.cat,percent:isSpecial?0:+slot.pct,amount:cbAmount,manual:cbManualOverride,special:isSpecial}:null,
       note: $('tx-note').value.trim(), date: $('tx-date').value || todayISO(),
     };
   }
@@ -984,10 +1021,28 @@ function renderAnalytics() {
   $('an-break').innerHTML = anView === 'chart'
      ? donut(en, total, currency)
     : en.map(([n, s]) => `
-      <div class="bar">
+      <div class="bar tap-an" data-cat="${esc(n)}">
         <div class="bar-top"><span>${catIcon(isExp ? 'expense' : 'income', n)} ${esc(n)}</span><span><b>${money(s,currency)}</b> <i class="pct">${Math.round((s / total) * 100)}%</i></span></div>
         <div class="track"><i style="width:${Math.round((s / total) * 100)}%"></i></div>
       </div>`).join('');
+  $('an-break').querySelectorAll('.tap-an').forEach((el) => (el.onclick = () => openAnalyticsList(el.dataset.cat, isExp ? 'expense' : 'income')));
+}
+
+function openAnalyticsList(category, type) {
+  const currency = $('an-currency').value;
+  const list = txs.filter((t) => t.type === type && t.category === category && t.date.startsWith(anMonth) && txCurrency(t) === currency)
+    .sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
+  const total = list.reduce((s, t) => s + t.amount, 0);
+  $('an-list-title').textContent = `${category} · ${money(total, currency)}`;
+  $('an-list-body').innerHTML = list.length ? `<div class="card list">${list.map((t) => {
+    const acc = accounts.find((a) => a.id === t.account);
+    return `<div class="li">
+      <div class="ic">${catIcon(type, t.category)}</div>
+      <div class="grow"><div class="name">${formatDate(t.date)}</div>${acc ? `<div class="note note-account">${renderIcon(acc.icon)}<span>${esc(acc.name)}</span></div>` : ''}${t.note ? `<div class="note note-comment">${svgIcon('message')}<span>${esc(t.note)}</span></div>` : ''}</div>
+      <div class="amt ${type === 'income' ? 'in' : 'out'}">${type === 'income' ? '+' : '−'}${money(t.amount, currency)}</div>
+    </div>`;
+  }).join('')}</div>` : '<div class="empty">Операций нет</div>';
+  openModal('an-list');
 }
 
 function renderTrend() {
@@ -1129,7 +1184,8 @@ function renderInvestments() {
 }
 
 // ---------- Рендер: КЭШБЭК ----------
-let cbMode='categories', cbFilter='Всё', cbSlotIndex=null, orderingBanks=false;
+let cbMode='categories', cbFilter='Всё', cbSlotIndex=null, orderingBanks=false, cbQuery='';
+$('cb-search').oninput=(e)=>{cbQuery=e.target.value.trim().toLowerCase();renderCashback();};
 $('cb-bank-order').onclick=()=>{orderingBanks=!orderingBanks;renderCashback();};
 document.querySelectorAll('[data-cb-view]').forEach(b=>b.onclick=()=>{
   cbMode=b.dataset.cbView;
@@ -1147,9 +1203,11 @@ function renderCashback() {
   $('cb-total').textContent = showTotals ? 'Всего: ' + fmt.format(sumAll) : '';
   $('cb-month').hidden = !showTotals;
   $('cb-total').hidden = !showTotals;
-  $('cb-categories').innerHTML=cashbackCats.map(c=>`<button class="cb-chip ${cbFilter===c.name?'on':''}" data-cat="${esc(c.name)}"><span class="cb-chip-icon">${renderIcon(c.icon)}</span>${esc(c.name)}</button>`).join('');
+  const catList=cashbackCats.filter(c=>c.name.toLowerCase().includes(cbQuery));
+  $('cb-categories').innerHTML=catList.length?catList.map(c=>`<button class="cb-chip ${cbFilter===c.name?'on':''}" data-cat="${esc(c.name)}"><span class="cb-chip-icon">${renderIcon(c.icon)}</span>${esc(c.name)}</button>`).join(''):'<div class="cb-cats-empty">Ничего не найдено</div>';
   $('cb-categories').onclick=e=>{const b=e.target.closest('[data-cat]');if(b){cbFilter=b.dataset.cat;cbMode='categories';document.querySelectorAll('[data-cb-view]').forEach(x=>x.classList.toggle('on',x.dataset.cbView==='categories'));renderCashback();}};
   $('cb-categories').hidden=cbMode!=='categories';
+  $('cb-search').hidden=cbMode!=='categories';
   $('add-card').hidden=cbMode!=='banks';
   $('add-cb-cat').hidden=cbMode!=='banks';
   $('add-cb-offer').hidden=cbMode!=='offers';
@@ -1182,13 +1240,11 @@ function renderCashback() {
       if(o.dateFrom===o.dateTo)return `Только ${formatDate(o.dateTo)}`;
       return `С ${formatDate(o.dateFrom||o.dateTo)} по ${formatDate(o.dateTo)}`;
     };
-    $('card-list').innerHTML=`<div class="cb-offer-total">Получено по спец акциям в этом месяце <b>${money(specialTotal)}</b></div>`+(sortedOffers.length?sortedOffers.map(o=>{const b=cards.find(c=>c.id===o.bank);return `<article class="cb-offer ${o.dateTo&&o.dateTo<todayISO()?'expired':''}" data-offer="${o.id}"><div class="cb-bank-head"><span class="cb-logo" style="--brand:${esc(b?.logo?.color||'#806f54')}">${esc(b?.logo?.mark||'Б')}</span><strong>${esc(o.name)}</strong><button class="cb-offer-del" data-offer="${o.id}" aria-label="Удалить акцию">×</button></div><div class="cb-offer-meta">${esc(b?.name||'Банк')} · ${o.pct}% · максимум ${money(o.maxCashback)} кэшбэка</div><div class="cb-offer-order">Заказ от ${money(o.minAmount||0)} до <b>${money(o.maxOrder)}</b></div><div class="cb-offer-meta">${periodText(o)}</div></article>`}).join(''):'<div class="cb-empty">Специальных акций пока нет</div>');
-    $('card-list').onclick=e=>{
-      const del=e.target.closest('.cb-offer-del');
-      if(del){if(confirm('Удалить акцию?')){cbOffers=cbOffers.filter(o=>o.id!==+del.dataset.offer);save();renderCashback();}return;}
-      const art=e.target.closest('.cb-offer');
-      if(art){editingOffer=+art.dataset.offer;openModal('cb-offer');}
-    };
+    $('card-list').innerHTML=`<div class="cb-offer-total">Получено по спец акциям в этом месяце <b>${money(specialTotal)}</b></div>`+(sortedOffers.length?sortedOffers.map(o=>{const b=cards.find(c=>c.id===o.bank);return `<div class="swipe"><div class="swipe-actions"></div><article class="cb-offer ${o.dateTo&&o.dateTo<todayISO()?'expired':''}" data-offer="${o.id}"><div class="cb-bank-head"><span class="cb-logo" style="--brand:${esc(b?.logo?.color||'#806f54')}">${esc(b?.logo?.mark||'Б')}</span><strong>${esc(o.name)}</strong></div><div class="cb-offer-meta">${esc(b?.name||'Банк')} · ${o.pct}% · максимум ${money(o.maxCashback)} кэшбэка</div><div class="cb-offer-order">Заказ от ${money(o.minAmount||0)} до <b>${money(o.maxOrder)}</b></div><div class="cb-offer-meta">${periodText(o)}</div></article></div>`}).join(''):'<div class="cb-empty">Специальных акций пока нет</div>');
+    $('card-list').querySelectorAll('.swipe').forEach(el=>{
+      const id=+el.querySelector('.cb-offer').dataset.offer;
+      bindSwipe(el,[{icon:'trash',cls:'sw-del',cb:()=>{if(confirm('Удалить акцию?')){cbOffers=cbOffers.filter(o=>o.id!==id);save();renderCashback();}}}],()=>{editingOffer=id;openModal('cb-offer');});
+    });
     return;
   }
   $('card-list').innerHTML=shown.map(c=>{
