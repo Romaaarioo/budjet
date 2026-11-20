@@ -7,7 +7,7 @@
   <title>Мои Финансы</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="style.css?v=60">
+  <link rel="stylesheet" href="style.css?v=63">
   <link rel="stylesheet" href="gtavi.css?v=3">
 
   <script>
@@ -38,36 +38,31 @@
 
   <section id="view-analytics" class="view">
     <h1 class="title">Аналитика</h1>
-    <div class="an-periods" id="an-periods">
-      <button data-period="week">Неделя</button><button data-period="month" class="on">Месяц</button>
-      <button data-period="quarter">Квартал</button><button data-period="year">Год</button><button data-period="custom">Даты</button>
+    <div class="month-nav">
+      <button class="nav-arrow" id="month-prev" aria-label="Предыдущий месяц">‹</button>
+      <div id="month-label"></div>
+      <button class="nav-arrow" id="month-next" aria-label="Следующий месяц">›</button>
     </div>
-    <div class="an-quick" id="an-quick">
-      <button data-quick="this">Этот месяц</button><button data-quick="last">Прошлый</button>
-      <button data-quick="30">30 дней</button><button data-quick="ytd">С начала года</button>
+    <label class="currency-filter">Валюта аналитики<select id="an-currency"><option value="RUB">RUB · ₽</option><option value="USD">USD · $</option><option value="CNY">CNY · ¥</option></select></label>
+    <div class="seg" id="an-seg">
+      <button type="button" class="seg-btn on" data-mode="expense">Расходы</button>
+      <button type="button" class="seg-btn" data-mode="income">Доходы</button>
+      <button type="button" class="seg-btn" data-mode="net">Разница</button>
+      <button type="button" class="seg-btn" data-mode="budget">Бюджеты</button>
     </div>
-    <div class="an-date-range" id="an-date-range" hidden>
-      <label>С<input type="date" id="an-from"></label><label>По<input type="date" id="an-to"></label>
+    <div class="card compact an-head">
+      <div>
+        <div class="lbl" id="an-total-lbl">Расходы за месяц</div>
+        <div class="big sm" id="an-total">0 ₽</div>
+      </div>
+      <div class="mini-seg" id="an-toggle">
+        <button type="button" id="an-view-list" class="on" aria-label="Список"></button>
+        <button type="button" id="an-view-chart" aria-label="Диаграмма"></button>
+      </div>
     </div>
-    <div class="an-filters">
-      <label>Валюта<select id="an-currency"><option value="RUB">RUB · ₽</option><option value="USD">USD · $</option><option value="CNY">CNY · ¥</option></select></label>
-      <label>Счёт / карта<select id="an-source"></select></label>
-      <label>Категория<select id="an-category"><option value="all">Все категории</option></select></label>
-      <label>Тип операции<select id="an-type"><option value="all">Доходы и расходы</option><option value="expense">Расходы</option><option value="income">Доходы</option></select></label>
-    </div>
-    <div class="an-options">
-      <div class="an-toggle" id="an-value-mode"><button class="on" data-units="amount">Суммы</button><button data-units="percent">Проценты</button></div>
-      <label>Сравнить<select id="an-comparison"><option value="previous">С предыдущим периодом</option><option value="year">С годом ранее</option><option value="none">Без сравнения</option></select></label>
-    </div>
-    <div id="an-kpis" class="an-kpis"></div>
-    <section class="card an-panel"><h2>Доходы и расходы во времени</h2><div id="an-line-chart"></div><div id="an-line-table"></div></section>
-    <section class="card an-panel"><h2>Чистый денежный поток</h2><div id="an-net-chart"></div></section>
-    <section class="card an-panel"><h2>Расходы по категориям</h2><div id="an-category-chart"></div><div id="an-category-table"></div></section>
-    <section class="card an-panel"><h2>Доходы по источникам</h2><div id="an-income-table"></div></section>
-    <section class="card an-panel"><h2>Кэшбэк отдельно</h2><div id="an-cashback-table"></div></section>
-    <section class="card an-panel"><h2>Крупнейшие операции</h2><div id="an-top-ops"></div></section>
-    <section class="card an-panel"><h2>Бюджеты и необычные расходы</h2><div id="an-alerts"></div></section>
-    <section class="card an-panel"><h2>Наблюдения</h2><div id="an-insights"></div></section>
+    <div class="card compact"><div id="an-break"></div></div>
+    <div class="card compact"><div class="h2">За 6 месяцев</div><div id="an-trend"></div></div>
+    <div class="card compact"><div class="h2">Наблюдения</div><div id="an-insights"></div></div>
   </section>
 
   <section id="view-history" class="view">
@@ -120,8 +115,6 @@
         <span class="switch"><input type="checkbox" id="gtavi-toggle" checked><i></i></span>
       </label>
       <label class="row"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 13L2 9z"/><path d="M11 3 8 9l4 13 4-13-3-6z"/><path d="M2 9h20"/></svg></span>Liquid Glass
-        <span class="switch"><input type="checkbox" id="glass-toggle" checked><i></i></span>
-      </label>
         <span class="switch"><input type="checkbox" id="glass-toggle" checked><i></i></span>
       </label>
     </div>
@@ -311,7 +304,7 @@
   </div>
 </div>
 
-<script src="app.js?v=62"></script>
+<script src="app.js?v=63"></script>
 </body>
 </html>
 

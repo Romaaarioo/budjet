@@ -5,3 +5,10 @@ Thumbs.db
 # Настройки редакторов
 .vscode/
 .idea/
+
+# Локальные черновики (не публиковать)
+analytics-v2.js
+analytics-v2.css
+GI/
+awesome-design-md-main/
+menu/
