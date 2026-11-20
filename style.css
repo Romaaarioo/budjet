@@ -440,7 +440,10 @@ body::before, body::after { display: none !important; animation: none !important
 .cb-slots { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; margin-top:10px; }
 .cb-slot { display:flex; justify-content:space-between; align-items:center; gap:8px; min-width:0; border:1px solid var(--sep); border-radius:10px; padding:8px 10px; color:var(--muted); background:var(--field); font:inherit; font-size:13px; text-align:left; }
 .cb-slot-swipe { min-width:0; overflow:hidden; border-radius:10px; }
-.cb-slot-swipe .cb-slot { position:relative; z-index:1; width:100%; transition:transform .25s ease; }
+.cb-slot-swipe .cb-slot { position:relative; z-index:1; width:100%; background:var(--li) !important; transition:transform .25s ease; }
+.cb-bank-head-swipe .cb-bank-head { background:var(--li) !important; }
+.cb-bank-head-swipe .swipe-actions button, .cb-slot-swipe .swipe-actions button { visibility:hidden; }
+.cb-bank-head-swipe[data-open] .swipe-actions button, .cb-slot-swipe[data-open] .swipe-actions button { visibility:visible; }
 .cb-slot span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .cb-slot b { color:var(--text); white-space:nowrap; }
 .cb-list.banks { overflow:visible; border:0; background:transparent; }
