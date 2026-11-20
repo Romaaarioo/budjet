@@ -269,7 +269,7 @@ themeBox.onchange = () => {
   const t = themeBox.checked ? 'dark' : 'light';
   document.documentElement.dataset.theme = t;
   localStorage.setItem('fin_theme', t);
-  document.querySelector('meta[name=theme-color]').content = t === 'light' ? '#f2f2f7' : '#151613';
+  document.querySelector('meta[name=theme-color]').content = t === 'light' ? '#ffeef5' : '#0d0512';
 };
 
 const glassBox = $('glass-toggle');
@@ -277,6 +277,13 @@ glassBox.checked = localStorage.getItem('fin_glass') !== 'false';
 glassBox.onchange = () => {
   document.documentElement.classList.toggle('glass', glassBox.checked);
   localStorage.setItem('fin_glass', glassBox.checked);
+};
+
+const gtaviBox = $('gtavi-toggle');
+gtaviBox.checked = localStorage.getItem('fin_gtavi') !== 'false';
+gtaviBox.onchange = () => {
+  document.documentElement.classList.toggle('gtavi', gtaviBox.checked);
+  localStorage.setItem('fin_gtavi', gtaviBox.checked);
 };
 
 const DATA_KEYS = ['fin_transactions', 'fin_investments', 'fin_categories', 'fin_autopays', 'fin_accounts', 'fin_cards', 'fin_cashback', 'fin_budgets', 'fin_goals', 'fin_cb_categories', 'fin_cb_offers'];
@@ -874,24 +881,7 @@ function deleteAccount(id) {
 let anMonth = month();   // отображаемый месяц ГГГГ-ММ
 let anMode = 'expense';  // expense | income | net
 let anView = 'list';     // list | chart
-
-$('month-prev').onclick = () => shiftMonth(-1);
-$('month-next').onclick = () => shiftMonth(1);
 $('an-currency').onchange = renderAnalytics;
-function shiftMonth(d) {
-  const [y, m] = anMonth.split('-').map(Number);
-  const dt = new Date(y, m - 1 + d, 1);
-  anMonth = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
-  renderAnalytics();
-}
-$('an-view-list').innerHTML = svgIcon('list');
-$('an-view-chart').innerHTML = svgIcon('pie');
-$('an-view-list').onclick = () => { anView = 'list'; setAnSegUI(); renderAnalytics(); };
-$('an-view-chart').onclick = () => { anView = 'chart'; setAnSegUI(); renderAnalytics(); };
-function setAnSegUI() {
-  $('an-view-list').classList.toggle('on', anView === 'list');
-  $('an-view-chart').classList.toggle('on', anView === 'chart');
-}
 
 // Круговая диаграмма
 function donut(entries, total, currency) {
@@ -1050,6 +1040,187 @@ function renderTrend() {
   const n=Object.keys(catsNow).sort((a,b)=>catsNow[b]-catsNow[a])[0];
   $('an-insights').textContent=n&&catsPrev[n]?`${n}: ${Math.round((catsNow[n]/catsPrev[n]-1)*100)}% к прошлому месяцу`:`Доходы ${money(last.inc,currency)}, расходы ${money(last.out,currency)} за месяц`;
 }
+
+// ---------- Новая аналитика ----------
+let anPeriod = 'month', anQuick = 'this', anUnits = 'amount';
+const anISO = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const anDate = s => { const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d,12); };
+const anShift = (s,n) => { const d=anDate(s); d.setDate(d.getDate()+n); return anISO(d); };
+const anSpan = r => Math.max(1,Math.round((anDate(r.to)-anDate(r.from))/86400000)+1);
+function anSetRange(preset) {
+  const today=new Date(), end=anISO(today), start=new Date(today);
+  anQuick=preset;
+  if(preset==='this'){ start.setDate(1); anPeriod='month'; }
+  if(preset==='last'){ start.setDate(1); start.setMonth(start.getMonth()-1); const last=new Date(today.getFullYear(),today.getMonth(),0); $('an-to').value=anISO(last); $('an-from').value=anISO(start); anPeriod='month'; anSyncRange(); return; }
+  if(preset==='30'){ start.setDate(start.getDate()-29); anPeriod='month'; }
+  if(preset==='ytd'){ start.setMonth(0,1); anPeriod='year'; }
+  $('an-from').value=anISO(start); $('an-to').value=end; anSyncRange();
+}
+function anSyncRange() {
+  const custom=anPeriod==='custom';
+  $('an-date-range').hidden=!custom;
+  document.querySelectorAll('#an-periods button').forEach(b=>b.classList.toggle('on',b.dataset.period===anPeriod));
+}
+function anRange() {
+  let from=$('an-from').value,to=$('an-to').value||anISO(new Date());
+  if(!from) from=to;
+  if(from>to)[from,to]=[to,from];
+  return {from,to};
+}
+function anCompareRange(r) {
+  const mode=$('an-comparison').value,span=anSpan(r);
+  if(mode==='none')return null;
+  if(mode==='year'){
+    const shift=s=>{const d=anDate(s);d.setFullYear(d.getFullYear()-1);return anISO(d);};
+    return {from:shift(r.from),to:shift(r.to)};
+  }
+  return {from:anShift(r.from,-span),to:anShift(r.to,-span)};
+}
+function anFillFilters() {
+  const source=$('an-source').value||'all',category=$('an-category').value||'all';
+  $('an-source').innerHTML='<option value="all">Все счета и карты</option>'+accounts.map(a=>`<option value="acc:${a.id}">${esc(a.name)} · ${a.currency||'RUB'}</option>`).join('')+cards.map(c=>`<option value="card:${c.id}">${esc(c.name)} · карта</option>`).join('');
+  $('an-category').innerHTML='<option value="all">Все категории</option>'+[...new Set([...cats.expense,...cats.income].map(c=>c.name).concat(txs.map(t=>t.category||'Без категории')))].sort().map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  if([...$('an-source').options].some(o=>o.value===source))$('an-source').value=source;
+  if([...$('an-category').options].some(o=>o.value===category))$('an-category').value=category;
+}
+function anTxList(r,currency,comparison=false) {
+  const source=$('an-source').value,cat=$('an-category').value,type=$('an-type').value;
+  return txs.filter(t=>{
+    const category=t.category||'Без категории';
+    if(!['income','expense'].includes(t.type)||!t.date||t.date<r.from||t.date>r.to||txCurrency(t)!==currency)return false;
+    if(type!=='all'&&t.type!==type)return false;
+    if(cat!=='all'&&category!==cat)return false;
+    if(source.startsWith('acc:')&&String(t.account)!==source.slice(4))return false;
+    if(source.startsWith('card:')&&String(t.cashback?.bankId)!==source.slice(5))return false;
+    return true;
+  });
+}
+function anCashback(r,currency) {
+  const source=$('an-source').value,cat=$('an-category').value,type=$('an-type').value;
+  if(currency!=='RUB'||source.startsWith('acc:')||cat!=='all'||type==='expense')return [];
+  return cbs.filter(c=>c.date>=r.from&&c.date<=r.to&&(!source.startsWith('card:')||String(c.card)===source.slice(5)));
+}
+function anMoney(n,currency) { return money(n,currency); }
+function anDelta(now,then,currency,hasPrior) {
+  if(!hasPrior)return '<small class="an-muted">Нет операций для сравнения</small>';
+  const delta=now-then, sign=delta>0?'+':'';
+  const pct=then===0?' · % недоступен (в периоде сравнения 0)':` · ${sign}${(delta/Math.abs(then)*100).toFixed(1)}%`;
+  return `<small class="an-delta">${sign}${anMoney(delta,currency)}${pct}</small>`;
+}
+function anBucketData(list,r) {
+  const days=anSpan(r),granularity=days<=31?'day':days<=100?'week':'month',buckets=[];
+  for(let d=anDate(r.from);d<=anDate(r.to);){
+    const from=anISO(d),end=new Date(d);
+    if(granularity==='day')end.setDate(end.getDate());
+    else if(granularity==='week')end.setDate(end.getDate()+6);
+    else end.setMonth(end.getMonth()+1,0);
+    if(end>anDate(r.to))end.setTime(anDate(r.to).getTime());
+    const to=anISO(end), items=list.filter(t=>t.date>=from&&t.date<=to);
+    buckets.push({from,to,label:granularity==='day'?from.slice(8):granularity==='week'?from.slice(5):from.slice(5,7),inc:items.filter(t=>t.type==='income').reduce((s,t)=>s+(+t.amount||0),0),exp:items.filter(t=>t.type==='expense').reduce((s,t)=>s+(+t.amount||0),0)});
+    d=new Date(end);d.setDate(d.getDate()+1);
+  }
+  return buckets;
+}
+function anRenderLine(buckets,currency) {
+  if(!buckets.some(b=>b.inc||b.exp)){
+    $('an-line-chart').innerHTML='<div class="empty">За выбранный период нет доходов или расходов.</div>';
+    $('an-line-table').innerHTML='';
+    return;
+  }
+  const totals={inc:buckets.reduce((s,b)=>s+b.inc,0),exp:buckets.reduce((s,b)=>s+b.exp,0)};
+  const val=(b,key)=>anUnits==='percent'?(totals[key]?b[key]/totals[key]*100:0):b[key];
+  const W=600,H=170,pad=24,max=Math.max(1,...buckets.flatMap(b=>[val(b,'inc'),val(b,'exp')]));
+  const scale=buckets.length<2?1:(W-pad*2)/(buckets.length-1);
+  const y=v=>H-pad-(v/max)*(H-pad*2), x=i=>pad+i*scale;
+  const path=key=>buckets.map((b,i)=>`${i?'L':'M'}${x(i)},${y(val(b,key))}`).join(' ');
+  const points=key=>buckets.map((b,i)=>`<circle class="an-${key}" cx="${x(i)}" cy="${y(val(b,key))}" r="3"><title>${b.from} · ${key==='inc'?'Доходы':'Расходы'}: ${anUnits==='percent'?val(b,key).toFixed(1)+'%':anMoney(b[key],currency)}</title></circle>`).join('');
+  const rows=buckets.map(b=>`<tr><th>${b.from}${b.to!==b.from?`–${b.to}`:''}</th><td>${anUnits==='percent'?(totals.inc?(b.inc/totals.inc*100).toFixed(1)+'%':'—'):anMoney(b.inc,currency)}</td><td>${anUnits==='percent'?(totals.exp?(b.exp/totals.exp*100).toFixed(1)+'%':'—'):anMoney(b.exp,currency)}</td></tr>`).join('');
+  $('an-line-chart').innerHTML=`<div class="an-legend"><span class="income-dot">Доходы</span><span class="expense-dot">Расходы</span></div><svg class="an-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="График доходов и расходов по периодам"><path class="an-income-line" d="${path('inc')}"/>${points('inc')}<path class="an-expense-line" d="${path('exp')}"/>${points('exp')}</svg>`;
+  $('an-line-table').innerHTML=`<details><summary>Таблица значений графика</summary><div class="an-table-wrap"><table><thead><tr><th>Дата</th><th>Доходы${anUnits==='percent'?' · доля':''}</th><th>Расходы${anUnits==='percent'?' · доля':''}</th></tr></thead><tbody>${rows}</tbody></table></div></details>`;
+}
+function renderAnalytics() {
+  anFillFilters();
+  const currency=$('an-currency').value,r=anRange(),cr=anCompareRange(r),list=anTxList(r,currency),prior=cr?anTxList(cr,currency):[];
+  const cash=anCashback(r,currency),priorCash=cr?anCashback(cr,currency):[];
+  const sum=(xs,type)=>xs.filter(t=>t.type===type).reduce((s,t)=>s+(+t.amount||0),0);
+  const income=sum(list,'income'),expense=sum(list,'expense'),net=income-expense,cashTotal=cash.reduce((s,c)=>s+(+c.amount||0),0);
+  const pIncome=sum(prior,'income'),pExpense=sum(prior,'expense'),pNet=pIncome-pExpense,pCash=priorCash.reduce((s,c)=>s+(+c.amount||0),0);
+  const cashReason=currency!=='RUB'?'В записях кэшбэка валюта не указана; сумма ведётся в RUB':$('an-source').value.startsWith('acc:')?'Записи кэшбэка не привязаны к счёту':$('an-category').value!=='all'?'В отдельных записях кэшбэка не указана категория':$('an-type').value==='expense'?'Кэшбэк показывается отдельно от расходов':'Нет отдельных записей о полученном кэшбэке';
+  const activeStart=list.length?list.reduce((a,t)=>t.date<a?t.date:a,list[0].date):null;
+  const avgEnd=r.to<anISO(new Date())?r.to:anISO(new Date());
+  const avgDays=activeStart&&activeStart<=avgEnd?Math.max(1,Math.round((anDate(avgEnd)-anDate(activeStart))/86400000)+1):0;
+  const avg=avgDays?expense/avgDays:0;
+  const priorStart=prior.filter(t=>t.type==='expense').map(t=>t.date).sort()[0];
+  const priorEnd=cr&&cr.to<anISO(new Date())?cr.to:anISO(new Date());
+  const priorDays=priorStart&&priorStart<=priorEnd?Math.max(1,Math.round((anDate(priorEnd)-anDate(priorStart))/86400000)+1):0;
+  const hasTx=list.length>0,hasExpense=list.some(t=>t.type==='expense');
+  const cardsKpi=[
+    ['Доходы',hasTx?income:'—',pIncome,prior.length>0],['Расходы',hasTx?expense:'—',pExpense,prior.length>0],
+    ['Чистый поток',hasTx?net:'—',pNet,prior.length>0],['Кэшбэк получен',cash.length?cashTotal:'—',pCash,priorCash.length>0],
+    ['Расходы / доходы',income?expense/income*100:null,pIncome?pExpense/pIncome*100:null,prior.length>0],
+    ['Средний расход в день',hasExpense?avg:'—',priorDays?pExpense/priorDays:0,priorDays>0]
+  ];
+  $('an-kpis').innerHTML=cardsKpi.map(([label,value,old,has])=>{
+    const ratio=label==='Расходы / доходы';
+    let comparison;
+    if(ratio)comparison=value===null?'<small class="an-muted">Нет доходов для расчёта</small>':!has?'<small class="an-muted">Нет операций для сравнения</small>':old===null?'<small class="an-muted">Доля сравнения недоступна: доходы равны 0</small>':`<small class="an-delta">${value-old>0?'+':''}${(value-old).toFixed(1)} п.п. · ${old?`${value-old>0?'+':''}${((value-old)/Math.abs(old)*100).toFixed(1)}%`:'% недоступен (0%)'}</small>`;
+    else comparison=old===null?`<small class="an-muted">${label==='Средний расход в день'?'Доля расходов от доходов за период':'Нет данных с текущими фильтрами'}</small>`:value==='—'?`<small class="an-muted">${label==='Кэшбэк получен'?cashReason:'Недостаточно данных в выбранном периоде'}</small>`:anDelta(value,old,currency,has);
+    return `<article class="an-kpi"><span>${label}</span><strong>${ratio?(value===null?'—':`${value.toFixed(1)}%`):typeof value==='number'?anMoney(value,currency):value}</strong>${comparison}</article>`;
+  }).join('');
+  const buckets=anBucketData(list,r);
+  anRenderLine(buckets,currency);
+  const netValue=b=>anUnits==='percent'?(b.inc+b.exp?(b.inc-b.exp)/(b.inc+b.exp)*100:0):b.inc-b.exp;
+  const maxNet=Math.max(1,...buckets.map(b=>Math.abs(netValue(b))));
+  $('an-net-chart').innerHTML=buckets.some(b=>b.inc||b.exp)?`<div class="an-net-list">${buckets.map(b=>{const v=netValue(b);return `<div class="an-net-row" title="${b.from}: ${anUnits==='percent'?v.toFixed(1)+'%':anMoney(b.inc-b.exp,currency)}"><span>${b.label}</span><i class="${v<0?'negative':''}" style="width:${Math.max(2,Math.abs(v)/maxNet*100)}%"></i><b>${v>0?'+':''}${anUnits==='percent'?v.toFixed(1)+'%':anMoney(v,currency)}</b></div>`}).join('')}</div>`:'<div class="empty">Нет операций для расчёта потока.</div>';
+  const catsNow={},catCounts={};list.filter(t=>t.type==='expense').forEach(t=>{const n=t.category||'Без категории';catsNow[n]=(catsNow[n]||0)+(+t.amount||0);catCounts[n]=(catCounts[n]||0)+1});
+  const catsPrev={};prior.filter(t=>t.type==='expense').forEach(t=>{const n=t.category||'Без категории';catsPrev[n]=(catsPrev[n]||0)+(+t.amount||0)});
+  const catEntries=Object.entries(catsNow).sort((a,b)=>b[1]-a[1]);
+  const visible=catEntries.slice(0,8),other=catEntries.slice(8);
+  const rows=(entries)=>entries.map(([n,v])=>`<tr><th>${esc(n)}</th><td>${anMoney(v,currency)}</td><td>${expense?(v/expense*100).toFixed(1):'0.0'}%</td><td>${anMoney(v/Math.max(1,catCounts[n]||1),currency)}</td><td>${anDelta(v,catsPrev[n]||0,currency,!!catsPrev[n])}</td></tr>`).join('');
+  const catBar=(entries,total)=>entries.map(([n,v])=>`<div class="an-bar-row" title="${esc(n)}: ${anMoney(v,currency)} · ${total?(v/total*100).toFixed(1):0}%"><span>${esc(n)}</span><i><b style="width:${total?Math.max(2,v/total*100):0}%"></b></i><strong>${anUnits==='percent'?(total?(v/total*100).toFixed(1)+'%':'0%'):anMoney(v,currency)}</strong></div>`).join('');
+  $('an-category-chart').innerHTML=catEntries.length?catBar([...visible,...(other.length?[['Прочее',other.reduce((s,x)=>s+x[1],0)]]:[])],expense):'<div class="empty">Добавьте расходы, чтобы увидеть распределение по категориям.</div>';
+  $('an-category-table').innerHTML=catEntries.length?`<div class="an-table-wrap"><table><thead><tr><th>Категория</th><th>Сумма</th><th>Доля</th><th>Среднее</th><th>Изменение</th></tr></thead><tbody>${rows(visible)}</tbody></table></div>${other.length?`<details><summary>Прочее · ${other.length} категорий</summary><div class="an-table-wrap"><table><tbody>${rows(other)}</tbody></table></div></details>`:''}`:'';
+  const incomeCats={};list.filter(t=>t.type==='income').forEach(t=>{const n=t.category||'Без категории';incomeCats[n]=(incomeCats[n]||0)+(+t.amount||0)});
+  $('an-income-table').innerHTML=Object.keys(incomeCats).length?`<div class="an-table-wrap"><table><thead><tr><th>Источник</th><th>Сумма</th><th>Доля</th></tr></thead><tbody>${Object.entries(incomeCats).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`<tr><th>${esc(n)}</th><td>${anMoney(v,currency)}</td><td>${income?(v/income*100).toFixed(1):0}%</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">За период нет доходов с указанными источниками.</div>';
+  const cashByBank={};
+  cash.forEach(c=>{const name=cards.find(b=>b.id===+c.card)?.name||'Без банка';cashByBank[name]=(cashByBank[name]||0)+(+c.amount||0)});
+  const estimates={};
+  list.filter(t=>t.type==='expense'&&t.cashback&&!t.cashback.special).forEach(t=>{const n=t.cashback.category||'Без категории';estimates[n]=(estimates[n]||0)+(+t.cashback.amount||0)});
+  $('an-cashback-table').innerHTML=`${Object.keys(cashByBank).length?`<div class="an-table-wrap"><table><thead><tr><th>Получено · банк</th><th>Сумма</th></tr></thead><tbody>${Object.entries(cashByBank).map(([n,v])=>`<tr><th>${esc(n)}</th><td>${anMoney(v,currency)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="an-muted">Нет отдельных записей о полученном кэшбэке за выбранный период.</div>'}${Object.keys(estimates).length?`<p class="an-muted">Расчётный кэшбэк в операциях — отдельно, не прибавляется к полученному: ${Object.entries(estimates).map(([n,v])=>`${esc(n)} ${anMoney(v,currency)}`).join(' · ')}</p>`:''}`;
+  const top=[...list].sort((a,b)=>b.amount-a.amount).slice(0,6);
+  $('an-top-ops').innerHTML=top.length?`<div class="an-op-list">${top.map(t=>`<div class="an-op"><span class="an-op-date">${formatDate(t.date)}</span><span class="grow"><b>${esc(t.category||'Без категории')}</b>${t.note?`<small>${esc(t.note)}</small>`:''}</span><strong class="${t.type==='income'?'in':'out'}">${t.type==='income'?'+':'−'}${anMoney(t.amount,currency)}</strong></div>`).join('')}</div>`:'<div class="empty">Операций за выбранный период нет. Добавьте доходы или расходы.</div>';
+  const alerts=[];
+  if(currency==='RUB'&&r.from.slice(0,7)===r.to.slice(0,7)){
+    const budgetRows=Object.entries(budgets).map(([n,lim])=>{const used=catsNow[n]||0;return {n,lim,used}}).filter(x=>x.lim);
+    budgetRows.forEach(x=>alerts.push(`<div class="an-budget"><span>${esc(x.n)} · ${anMoney(x.used,currency)} из ${anMoney(x.lim,currency)}</span><i><b class="${x.used>x.lim?'over':''}" style="width:${Math.min(100,x.used/x.lim*100)}%"></b></i></div>`));
+  } else if(Object.keys(budgets).length) alerts.push('<small class="an-muted">Лимиты месячные; выберите даты в пределах одного месяца для их сравнения.</small>');
+  const historyByCat={};txs.filter(t=>t.type==='expense'&&txCurrency(t)===currency&&t.date<=r.to).forEach(t=>{const n=t.category||'Без категории';(historyByCat[n]??=[]).push(+t.amount||0)});
+  const unusual=list.filter(t=>t.type==='expense').filter(t=>{const a=historyByCat[t.category||'Без категории']||[];return a.length>=5&&t.amount>a.reduce((s,v)=>s+v,0)/a.length*2.5});
+  if(unusual.length)alerts.push(`<div class="an-observation">Крупные траты относительно истории категории (не менее 5 операций): ${unusual.slice(0,3).map(t=>`${esc(t.category||'Без категории')} · ${anMoney(t.amount,currency)}`).join('; ')}</div>`);
+  $('an-alerts').innerHTML=alerts.join('')||'<div class="an-muted">Для отображения бюджетов задайте лимиты. Необычные расходы появятся после накопления минимум пяти операций в категории.</div>';
+  const insights=[];
+  if(catEntries.length) insights.push(`Крупнейшая расходная категория: ${catEntries[0][0]} — ${anMoney(catEntries[0][1],currency)} за ${r.from}–${r.to}.`);
+  const months={};txs.filter(t=>t.type==='expense'&&txCurrency(t)===currency&&t.date<=r.to&&(!$('an-source').value.startsWith('acc:')||String(t.account)===$('an-source').value.slice(4))).forEach(t=>{const key=t.date.slice(0,7);months[key]=(months[key]||0)+(+t.amount||0)});
+  if(Object.keys(months).length>=2)insights.push(`Средние расходы за доступные месяцы (${Object.keys(months).length} мес.): ${anMoney(Object.values(months).reduce((a,b)=>a+b,0)/Object.keys(months).length,currency)} в месяц.`);
+  if(cashTotal) insights.push(`Получено кэшбэка: ${anMoney(cashTotal,currency)}. Учтены записи начислений; сумма не прибавлена к доходам.`);
+  if(!list.length)insights.push('Нет операций с текущими фильтрами. Добавьте доходы и расходы, чтобы увидеть динамику и сравнения.');
+  if(cr&&!prior.length)insights.push('Для выбранного периода сравнения пока недостаточно данных: в сравнительном интервале нет операций.');
+  $('an-insights').innerHTML=insights.map(t=>`<p>${esc(t)}</p>`).join('')||'<p class="an-muted">Нет достаточных данных для наблюдений.</p>';
+}
+document.querySelectorAll('#an-periods button').forEach(b=>b.onclick=()=>{
+  anPeriod=b.dataset.period;anQuick='';
+  if(anPeriod==='custom'){anSyncRange();renderAnalytics();return;}
+  const selected=anPeriod;
+  anSetRange(selected==='week'?'30':selected==='month'?'this':selected==='quarter'?'30':'ytd');
+  anPeriod=selected;
+  if(anPeriod==='week'){const d=new Date(),from=new Date(d);from.setDate(from.getDate()-6);$('an-from').value=anISO(from);$('an-to').value=anISO(d);}
+  if(anPeriod==='quarter'){const d=new Date(),from=new Date(d);from.setMonth(from.getMonth()-2,1);$('an-from').value=anISO(from);$('an-to').value=anISO(d);}
+  anSyncRange();renderAnalytics();
+});
+document.querySelectorAll('#an-quick button').forEach(b=>b.onclick=()=>{anSetRange(b.dataset.quick);renderAnalytics();});
+['an-from','an-to','an-source','an-category','an-type','an-currency','an-comparison'].forEach(id=>$(id).onchange=renderAnalytics);
+document.querySelectorAll('#an-value-mode button').forEach(b=>b.onclick=()=>{anUnits=b.dataset.units;document.querySelectorAll('#an-value-mode button').forEach(x=>x.classList.toggle('on',x===b));renderAnalytics();});
+anSetRange('this');
 
 function renderGoals() {
   $('goal-list').innerHTML = goals.length ? goals.map((g) => `
@@ -1366,7 +1537,7 @@ $('add-cb-cat').onclick = () => {
   $('cbcat-name').value='';$('cbcat-icon').value='✨';openModal('cbcat');
 };
 $('add-cb-offer').onclick=()=>openModal('cb-offer');
-function renderAll() { renderOverview(); renderAnalytics(); renderTrend(); renderGoals(); renderHistory(); renderInvestments(); renderCashback(); renderCats(); renderPays(); }
+function renderAll() { renderOverview(); renderAnalytics(); renderGoals(); renderHistory(); renderInvestments(); renderCashback(); renderCats(); renderPays(); }
 runPays();
 renderAll();
 showView('overview');

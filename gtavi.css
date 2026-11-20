@@ -1,0 +1,96 @@
+/* Vice City neon: тёмная база + светлый рассветный вариант. */
+:root.gtavi {
+  --bg: #12041c;
+  --card: #200b30;
+  --field: #2e1140;
+  --text: #fff3f8;
+  --muted: #f4a7c6;
+  --sep: #57216b;
+  --acc: #ff2d95;
+  --green: #2bffc6;
+  --red: #ff6b47;
+  --nav: rgba(24, 7, 34, .9);
+  --li: #200b30;
+  --vice-grad: linear-gradient(135deg, #ff2d95, #ff7a3d 52%, #ffb92e);
+  --vice-glow: 0 0 24px rgba(255, 45, 149, .45), 0 0 60px rgba(255, 45, 149, .18);
+  --vice-text-glow: 0 0 14px rgba(255, 45, 149, .35);
+}
+:root.gtavi[data-theme="light"] {
+  --bg: #fff0f6;
+  --card: #ffffff;
+  --field: #ffe3ef;
+  --text: #45102f;
+  --muted: #b05c85;
+  --sep: #ffc6dc;
+  --acc: #f02d7d;
+  --green: #00b389;
+  --red: #e05a35;
+  --nav: rgba(255, 240, 246, .92);
+  --li: #ffffff;
+  --vice-grad: linear-gradient(135deg, #ff5f9e, #ff8f56 52%, #ffc23e);
+  --vice-glow: 0 0 18px rgba(240, 45, 125, .28);
+  --vice-text-glow: none;
+}
+
+:root.gtavi body {
+  background: radial-gradient(120vmax 70vmax at 50% 120%, #38104e 0%, #12041c 62%);
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+:root.gtavi[data-theme="light"] body { background: linear-gradient(180deg, #ffdcec, #fff0f6 42%); }
+:root.gtavi .title { font-weight: 800; letter-spacing: -.8px; }
+:root.gtavi .title, :root.gtavi .tab.active, :root.gtavi .h2 {
+  background: var(--vice-grad); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+:root.gtavi .title, :root.gtavi .tab.active { filter: drop-shadow(var(--vice-text-glow)); }
+:root.gtavi .card { border-radius: 18px; box-shadow: none !important; }
+:root.gtavi .balance {
+  background: var(--vice-grad) !important; color: #fff; box-shadow: var(--vice-glow) !important;
+}
+:root.gtavi .balance .big, :root.gtavi .balance .lbl { color: #fff; }
+:root.gtavi .balance .big { text-shadow: 0 1px 12px rgba(0,0,0,.25); }
+:root.gtavi .track i, :root.gtavi .cb-limit-track i { background: var(--vice-grad) !important; }
+:root.gtavi .track { background: var(--field); }
+:root.gtavi .btn, :root.gtavi .btn.primary, :root.gtavi #fab, :root.gtavi .cb-purchase {
+  background: var(--vice-grad) !important; color: #fff !important; border: none;
+  box-shadow: var(--vice-glow);
+  text-shadow: 0 1px 2px rgba(0,0,0,.22);
+}
+:root.gtavi .btn.ghost { background: var(--field) !important; color: var(--text) !important; box-shadow: none; }
+:root.gtavi .seg, :root.gtavi .mini-seg, :root.gtavi .cb-tabs { background: var(--field); }
+:root.gtavi .mini-seg button.on { background: var(--vice-grad) !important; color: #fff !important; }
+:root.gtavi .seg-btn.on, :root.gtavi .cb-tabs button.on {
+  background: var(--vice-grad) !important; color: #fff !important; box-shadow: none;
+}
+:root.gtavi .tabs { background: var(--nav); border-top: 1px solid var(--sep); }
+:root.gtavi .tab span { font-weight: 500; }
+:root.gtavi .tab svg { color: var(--muted); }
+:root.gtavi .tab.active svg { color: var(--acc); }
+:root.gtavi .ic { background: var(--field); border-radius: 12px; }
+:root.gtavi .ic svg, :root.gtavi .bar-top svg, :root.gtavi .name svg { color: var(--acc); }
+:root.gtavi input, :root.gtavi select, :root.gtavi .search { background: var(--field); color: var(--text); font-weight: 500; }
+:root.gtavi input:focus, :root.gtavi select:focus, :root.gtavi .search:focus { box-shadow: 0 0 0 2px var(--acc); }
+:root.gtavi .sheet { background: var(--card) !important; border: 1px solid var(--sep); }
+:root.gtavi .sheet::before { background: var(--acc); box-shadow: var(--vice-glow); }
+:root.gtavi .name, :root.gtavi .amt, :root.gtavi .li, :root.gtavi .row { text-rendering: optimizeLegibility; }
+:root.gtavi .amt { font-weight: 650; }
+:root.gtavi .cb-chip.on { background: var(--vice-grad) !important; color: #fff !important; border-color: transparent; }
+:root.gtavi .cb-logo, :root.gtavi .cb-rate { box-shadow: var(--vice-glow); }
+:root.gtavi .cb-chip, :root.gtavi .cb-slot, :root.gtavi .cb-rate, :root.gtavi .tx-cashback { background: var(--field); }
+:root.gtavi .sw-edit { background: #c91e6e !important; }
+:root.gtavi .sw-del { background: #e6452b !important; }
+:root.gtavi .an-kpi, :root.gtavi .an-panel { background: var(--card); }
+:root.gtavi .an-kpi strong { background: var(--vice-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+:root.gtavi .an-kpi { box-shadow: var(--vice-glow); }
+:root.gtavi .an-panel h2, :root.gtavi .an-kpi span { color: var(--muted); }
+:root.gtavi .an-bar-row > i > b, :root.gtavi .an-budget > i > b { background: var(--vice-grad) !important; }
+:root.gtavi .an-income-line, :root.gtavi .an-svg circle.an-inc { stroke: #2bffc6 !important; }
+:root.gtavi .an-expense-line, :root.gtavi .an-svg circle.an-exp { stroke: #ff6b47 !important; }
+:root.gtavi .an-net-row > i { background: var(--green) !important; }
+:root.gtavi .an-net-row > i.negative { background: var(--red) !important; }
+:root.gtavi .an-periods button.on, :root.gtavi .an-toggle button.on {
+  background: var(--vice-grad) !important; color: #fff !important; border-color: transparent !important;
+  text-shadow: 0 1px 2px rgba(0,0,0,.22);
+}
+:root.gtavi .big { font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { :root.gtavi * { animation: none !important; } }
