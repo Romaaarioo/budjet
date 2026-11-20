@@ -207,11 +207,11 @@ function cashbackQuote(amount, bank, slot, excludeId = null) {
 let openSwipe = null;
 function closeSwipe(el) {
   delete el.dataset.open;
-  el.querySelector('.li, .card, .cb-offer').style.transform = 'translateX(0)';
+  el.querySelector('.li, .card, .cb-offer, .cb-bank-head, .cb-slot').style.transform = 'translateX(0)';
   if (openSwipe === el) openSwipe = null;
 }
 function bindSwipe(el, actions, onTap) {
-  const content = el.querySelector('.li, .card, .cb-offer');
+  const content = el.querySelector('.li, .card, .cb-offer, .cb-bank-head, .cb-slot');
   const w = actions.length * 52;
 
   el.querySelector('.swipe-actions').innerHTML = actions.map((a, i) =>
@@ -248,7 +248,7 @@ function bindSwipe(el, actions, onTap) {
     swiping = false;
   });
   el.addEventListener('touchcancel', () => { content.style.transition = ''; closeSwipe(el); x0 = null; swiping = false; });
-  content.onclick = () => { if (el.dataset.open) { closeSwipe(el); return; } if (onTap) onTap(); };
+  content.onclick = (e) => { if (el.dataset.open) { e.stopPropagation(); closeSwipe(el); return; } if (onTap) onTap(); };
 }
 
 // ---------- Навигация ----------
@@ -1250,10 +1250,21 @@ function renderCashback() {
     if(cbMode==='banks'){
       const used=cashbackUsed(c),limit=c.monthlyLimit,progress=limit?Math.min(100,used/limit*100):0;
       const orderControls=orderingBanks?`<span class="account-order-controls"><button type="button" data-bmove="-1" aria-label="Выше">↑</button><button type="button" data-bmove="1" aria-label="Ниже">↓</button></span>`:'';
-      return `<article class="cb-bank ${orderingBanks?'ordering':''}" data-bid="${c.id}"><div class="cb-bank-head">${logo}<strong>${esc(c.name)}</strong>${orderControls}<button class="cb-add-slot" data-bank="${c.id}" aria-label="Добавить слот">＋</button></div>${limit?`<div class="cb-limit"><div class="cb-limit-label"><span>Лимит за месяц</span><b>осталось ${num(Math.max(0,limit-used))} из ${num(limit)} ₽</b></div><div class="cb-limit-track"><i style="width:${progress}%"></i></div></div>`:`<div class="cb-limit-label">Месячный лимит не задан</div>`}<div class="cb-slots">${slots.map((s,i)=>`<button class="cb-slot" data-bank="${c.id}" data-slot="${i}"><span>${esc(s.cat||'Выбрать категорию')}${s.condition?` · ${esc(s.condition)}`:''}</span><b>${s.pct||0}%</b></button>`).join('')}</div></article>`;
+      return `<article class="cb-bank ${orderingBanks?'ordering':''}" data-bid="${c.id}"><div class="swipe cb-bank-head-swipe"><div class="swipe-actions"></div><div class="cb-bank-head">${logo}<strong>${esc(c.name)}</strong>${orderControls}<button class="cb-add-slot" data-bank="${c.id}" aria-label="Добавить слот">＋</button></div></div>${limit?`<div class="cb-limit"><div class="cb-limit-label"><span>Лимит за месяц</span><b>осталось ${num(Math.max(0,limit-used))} из ${num(limit)} ₽</b></div><div class="cb-limit-track"><i style="width:${progress}%"></i></div></div>`:`<div class="cb-limit-label">Месячный лимит не задан</div>`}<div class="cb-slots">${slots.map((s,i)=>`<div class="swipe cb-slot-swipe"><div class="swipe-actions"></div><button class="cb-slot" data-bank="${c.id}" data-slot="${i}"><span>${esc(s.cat||'Выбрать категорию')}${s.condition?` · ${esc(s.condition)}`:''}</span><b>${s.pct||0}%</b></button></div>`).join('')}</div></article>`;
     }
     return `<button class="cb-bank-row" data-bank="${c.id}">${logo}<div class="cb-bank-info"><strong>${esc(c.name)}</strong>${bestSlot?.condition?`<span class="cb-condition">${esc(bestSlot.condition)}</span>`:''}</div><b class="cb-rate">${best}%</b></button>`;
   }).join('')||'<div class="cb-empty">Пока нет банков с этой категорией</div>';
+  if(cbMode==='banks'){
+    $('card-list').querySelectorAll('.cb-bank-head-swipe').forEach(el=>{
+      const id=+el.closest('.cb-bank').dataset.bid;
+      const bank=cards.find(c=>c.id===id);
+      bindSwipe(el,[{icon:'trash',cls:'sw-del',cb:()=>{if(confirm(`Удалить банк «${bank.name}»? История операций сохранится.`)){cards=cards.filter(c=>c.id!==id);save();renderCashback();}}}]);
+    });
+    $('card-list').querySelectorAll('.cb-slot-swipe').forEach(el=>{
+      const slot=el.querySelector('.cb-slot'),bankId=+slot.dataset.bank,slotIndex=+slot.dataset.slot;
+      bindSwipe(el,[{icon:'trash',cls:'sw-del',cb:()=>{const bank=cards.find(c=>c.id===bankId);if(bank&&confirm(`Удалить категорию «${bank.slots[slotIndex]?.cat||'Без названия'}» из банка «${bank.name}»?`)){bank.slots.splice(slotIndex,1);save();renderCashback();}}}]);
+    });
+  }
   $('card-list').onclick=e=>{
     const move=e.target.closest('[data-bmove]');
     if(move){

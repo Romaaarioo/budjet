@@ -433,10 +433,14 @@ body::before, body::after { display: none !important; animation: none !important
 .cb-bank { padding:12px 16px; border-bottom:1px solid var(--sep); }
 .cb-bank:last-child { border-bottom:0; }
 .cb-bank-head { display:flex; align-items:center; gap:12px; min-height:42px; }
+.cb-bank-head-swipe { border-radius:12px; }
+.cb-bank-head-swipe .cb-bank-head { position:relative; z-index:1; background:var(--card); transition:transform .25s ease; }
 .cb-bank-head strong { flex:1; }
 .cb-add-slot { border:0; border-radius:10px; width:34px; height:34px; color:var(--acc); background:var(--field); font-size:20px; }
 .cb-slots { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; margin-top:10px; }
 .cb-slot { display:flex; justify-content:space-between; align-items:center; gap:8px; min-width:0; border:1px solid var(--sep); border-radius:10px; padding:8px 10px; color:var(--muted); background:var(--field); font:inherit; font-size:13px; text-align:left; }
+.cb-slot-swipe { min-width:0; overflow:hidden; border-radius:10px; }
+.cb-slot-swipe .cb-slot { position:relative; z-index:1; width:100%; transition:transform .25s ease; }
 .cb-slot span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .cb-slot b { color:var(--text); white-space:nowrap; }
 .cb-list.banks { overflow:visible; border:0; background:transparent; }
