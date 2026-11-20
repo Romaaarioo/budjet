@@ -334,15 +334,7 @@ function fitSheetToViewport() {
   const vv = window.visualViewport;
   if (!vv) return;
   const kb = window.innerHeight - (vv.height + vv.offsetTop);
-  if (kb > 80) {
-    modal.style.top = `${Math.round(vv.offsetTop)}px`;
-    modal.style.height = `${Math.round(vv.height)}px`;
-    sheetEl.style.maxHeight = '100%';
-  } else {
-    modal.style.top = '';
-    modal.style.height = '';
-    sheetEl.style.maxHeight = '';
-  }
+  sheetEl.style.paddingBottom = kb > 80 ? `calc(${Math.round(kb)}px + 24px + env(safe-area-inset-bottom))` : '';
 }
 window.visualViewport?.addEventListener('resize', () => {
   fitSheetToViewport();
@@ -455,6 +447,7 @@ function closeModal() {
   modal.style.top = '';
   modal.style.height = '';
   sheetEl.style.maxHeight = '';
+  sheetEl.style.paddingBottom = '';
   document.body.style.overflow = '';
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   document.querySelectorAll('.sheet form').forEach((f) => f.reset());
