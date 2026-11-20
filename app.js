@@ -112,12 +112,12 @@ let cbOffers = load('fin_cb_offers', []).map(o=>{if(o.date&&!o.dateTo){o.dateTo=
 let cbs = load('fin_cashback', []);       // полученный кэшбэк
 let budgets = load('fin_budgets', {});    // лимиты: категория → сумма в месяц
 let goals = load('fin_goals', []);
-const BANKS = [['Альфа',3,'#ef3124','А',5000],['ВТБ',4,'#00a7e1','ВТБ',3000],['Озон',4,'#005bff','O',3000],['Т-Банк',4,'#ffdd2d','Т',3000],['Сбер',3,'#21a038','С',2000],['МТС',5,'#e30611','МТС',10000],['Яндекс',5,'#fc3f1d','Я',10000],['ОТП',4,'#d71920','ОТП',3000],['Яндекс ПРО',6,'#fc3f1d','ЯП',10000],['Апельсин',3,'#ff8c00','А',50000],['WB',4,'#cb11ab','WB',null],['БКС',4,'#172d5c','БКС',null]];
+const BANKS = [['Альфа',3,'#ef3124','А',5000],['ВТБ',4,'#00a7e1','ВТБ',3000],['Озон',4,'#005bff','O',3000],['Т-Банк',4,'#ffdd2d','Т',3000],['Сбер',3,'#21a038','С',2000],['МТС',5,'#e30611','МТС',10000],['Яндекс',5,'#fc3f1d','Я',10000],['ОТП',4,'#d71920','ОТП',3000],['Яндекс ПРО',6,'#fc3f1d','ЯП',10000],['Апельсин',3,'#ff8c00','А',50000],['WB',4,'#cb11ab','WB',null],['БКС',4,'#172d5c','БКС',null],['Райффайзен',1,'#ffed00','R',null,1.5]];
 let cashbackSeeded=false;
 cards.forEach(c=>{if(!c.slots)c.slots=[{cat:c.cat||'Всё',pct:c.pct||0}];});
-BANKS.forEach(([name,count,color,mark,limit],i)=>{
+BANKS.forEach(([name,count,color,mark,limit,defaultPct],i)=>{
   let c=cards.find(x=>x.name.toLowerCase()===name.toLowerCase());
-  if(!c){c={id:Date.now()+i,name,cat:'Всё',pct:0,slots:[],monthlyLimit:limit};cards.push(c);cashbackSeeded=true;}
+  if(!c){c={id:Date.now()+i,name,cat:'Всё',pct:0,slots:defaultPct?[{cat:'Всё',pct:defaultPct}]:[],monthlyLimit:limit};cards.push(c);cashbackSeeded=true;}
   if(!c.logo){c.logo={color,mark};cashbackSeeded=true;} else c.logo={color,mark};
   if(c.monthlyLimit===undefined){c.monthlyLimit=limit;cashbackSeeded=true;}
   while(c.slots.length<count){c.slots.push({cat:'Всё',pct:0});cashbackSeeded=true;}
@@ -196,8 +196,9 @@ function cashbackUsed(bank, excludeId = null) {
 }
 function cashbackQuote(amount, bank, slot, excludeId = null) {
   if(!bank||!slot||!(+slot.pct>0))return {value:0,remaining:bank?.monthlyLimit??Infinity,eligible:0};
-  const eligible=Math.floor(Math.max(0,+amount||0)/100)*100;
-  const raw=Math.round(eligible*(+slot.pct)/100);
+  const exact=bank.name==='Райффайзен';
+  const eligible=exact?Math.max(0,+amount||0):Math.floor(Math.max(0,+amount||0)/100)*100;
+  const raw=exact?Math.round(eligible*(+slot.pct))/100:Math.round(eligible*(+slot.pct)/100);
   const used=cashbackUsed(bank,excludeId), remaining=bank.monthlyLimit==null?Infinity:Math.max(0,bank.monthlyLimit-used);
   return {value:Math.min(raw,remaining),remaining,eligible};
 }

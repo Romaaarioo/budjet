@@ -387,6 +387,9 @@ body::before, body::after { display: none !important; animation: none !important
 .goal-swipe { border-radius: 20px; margin-bottom: 14px; }
 .goal-swipe .card { margin-bottom: 0; }
 .swipe-actions button { opacity: 1; }
+.cb-list.offers > .swipe > .cb-offer { background:var(--li) !important; }
+.cb-list.offers > .swipe .swipe-actions button { visibility:hidden; }
+.cb-list.offers > .swipe[data-open] .swipe-actions button { visibility:visible; }
 .trend i { transition: height .28s ease; }
 .currency-filter { margin: 0 0 12px; }
 .bank-logo { width:38px; height:38px; flex:0 0 38px; }
@@ -413,6 +416,9 @@ body::before, body::after { display: none !important; animation: none !important
 .cb-chip-icon svg { width:16px; height:16px; }
 .cb-summary { display:flex; justify-content:space-between; gap:12px; margin:2px 4px 12px; color:var(--muted); font-size:13px; }
 .cb-summary b { color:var(--text); margin-left:8px; }
+.cb-summary { margin-bottom:4px; }
+.cb-footer.cb-manage { padding:4px 4px 8px; }
+.cb-actions { gap:10px; margin-bottom:12px; }
 .cb-section-title { display:flex; align-items:center; gap:10px; margin:18px 4px 10px; font-size:17px; }
 .cb-count { padding:2px 7px; border-radius:10px; color:var(--muted); background:var(--field); font-size:12px; }
 .cb-list { overflow:hidden; border:1px solid rgba(180,170,145,.12); border-radius:20px; background:var(--card); }
