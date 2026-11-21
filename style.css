@@ -212,12 +212,12 @@ main {
 }
 #fab:active { transform: scale(.9); }
 .tabs {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+  flex: 0 0 auto;
   display: flex;
   background: var(--nav);
   backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   border-top: 1px solid var(--sep);
-  padding: 6px 0 calc(6px + env(safe-area-inset-bottom));
+  padding: 7px 0 max(10px, calc(env(safe-area-inset-bottom) - 14px));
 }
 .tab {
   flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
