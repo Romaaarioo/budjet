@@ -66,15 +66,26 @@ body::after {
 /* ============ БАЗА ============ */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 [hidden] { display: none !important; }
-html { background: var(--bg); }
+html { background: var(--bg); height: 100%; }
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
   background: var(--bg);
   color: var(--text);
   -webkit-tap-highlight-color: transparent;
-  padding-bottom: 96px;
-  padding-top: env(safe-area-inset-top);
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   transition: background .3s, color .3s;
+}
+main {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: 96px;
 }
 .lbl { font-size: 13px; color: var(--muted); }
 .big { font-size: 38px; font-weight: 800; letter-spacing: -.5px; margin-top: 4px; }
@@ -474,12 +485,6 @@ body::before, body::after { display: none !important; animation: none !important
 .cb-text-btn { border:0; padding:4px 0; color:var(--acc); background:none; font:inherit; font-size:14px; }
 @media(max-width:640px) { .cb-slots { grid-template-columns:1fr; } .cb-limit-label {font-size:11px;} }
 button, .card, .li, .seg-btn, .tab, .switch i { -webkit-tap-highlight-color: transparent; }
-
-/* ============ АЛЕРТЫ ============ */
-.alert-banner { margin: 0 4px 14px; padding: 12px 14px; background: var(--card); border: 1px solid var(--sep); border-radius: 16px; font-size: 13px; }
-.alert-item { display: flex; gap: 8px; align-items: flex-start; padding: 4px 0; }
-.alert-item svg { width: 16px; height: 16px; color: var(--acc); flex: 0 0 16px; margin-top: 2px; }
-.alert-notify { margin-top: 8px; border: 0; background: var(--acc); color: #171611; border-radius: 12px; padding: 9px 14px; font: inherit; font-size: 13px; font-weight: 600; width: 100%; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }

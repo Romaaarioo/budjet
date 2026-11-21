@@ -264,6 +264,7 @@ function showView(name) {
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active',
     t.dataset.view === name || (t.dataset.view === 'more' && ['categories', 'autopays'].includes(name))));
   $('fab').hidden = name !== 'history'; // кнопка «+» только на «Операциях»
+  document.querySelector('main').scrollTop = 0;
   if (openSwipe) closeSwipe(openSwipe);
 }
 document.querySelectorAll('.tab').forEach((t) => (t.onclick = () => showView(t.dataset.view)));
@@ -1374,52 +1375,6 @@ function renderPays() {
   });
 }
 
-// ---------- Алерты: акции и автоплатежи ----------
-const ALERT_SEEN_KEY = 'fin_alerts_seen';
-function loadSeen() { try { return JSON.parse(localStorage.getItem(ALERT_SEEN_KEY)) || []; } catch { return []; } }
-function saveSeen(list) { localStorage.setItem(ALERT_SEEN_KEY, JSON.stringify(list.slice(-60))); }
-function collectAlerts() {
-  const today = todayISO();
-  const tmrwDate = new Date(); tmrwDate.setDate(tmrwDate.getDate() + 1);
-  const tomorrow = localISODate(tmrwDate);
-  const list = [];
-  for (const o of cbOffers) {
-    if (!o.dateTo) continue;
-    if (o.dateTo === tomorrow) list.push({ key: `offer-tmrw-${o.id}-${tomorrow}`, text: `Завтра заканчивается спецакция «${o.name}» — успей получить кэшбэк` });
-    else if (o.dateTo === today) list.push({ key: `offer-today-${o.id}-${today}`, text: `Сегодня последний день спецакции «${o.name}»` });
-  }
-  const tmrwDay = tmrwDate.getDate();
-  for (const p of pays) {
-    if (+p.day === tmrwDay) {
-      const a = accounts.find(x => x.id === +(p.account || accounts[0]?.id));
-      list.push({ key: `pay-tmrw-${p.id}-${tomorrow}`, text: `Завтра автоплатёж «${p.name}» на ${money(p.amount, a?.currency || 'RUB')}${a ? ` со счёта «${a.name}»` : ''}` });
-    }
-  }
-  return list;
-}
-function pushNotifications(alerts) {
-  if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  const seen = loadSeen();
-  alerts.filter(a => !seen.includes(a.key)).forEach(a => {
-    try { new Notification('Мои Финансы', { body: a.text }); seen.push(a.key); } catch {}
-  });
-  saveSeen(seen);
-}
-function updateAlertBanner() {
-  const box = $('alert-banner');
-  if (!box) return;
-  const alerts = collectAlerts();
-  if (!alerts.length) { box.hidden = true; box.innerHTML = ''; return; }
-  const canAsk = 'Notification' in window && Notification.permission === 'default';
-  box.hidden = false;
-  box.innerHTML = alerts.map(a => `<div class="alert-item">${svgIcon('bell')}<span>${esc(a.text)}</span></div>`).join('')
-    + (canAsk ? '<button type="button" class="alert-notify">🔔 Включить уведомления</button>' : '');
-  box.querySelector('.alert-notify')?.addEventListener('click', () => {
-    Notification.requestPermission().then(p => { if (p === 'granted') { updateAlertBanner(); pushNotifications(collectAlerts()); } });
-  });
-  pushNotifications(alerts);
-}
-
 // ---------- Запуск ----------
 $('add-goal').onclick = () => openModal('goal');
 $('add-inv').onclick = () => { editing=null; openModal('inv'); };
@@ -1431,7 +1386,7 @@ $('add-cb-cat').onclick = () => {
   $('cbcat-name').value='';$('cbcat-icon').value='✨';openModal('cbcat');
 };
 $('add-cb-offer').onclick=()=>openModal('cb-offer');
-function renderAll() { renderOverview(); renderAnalytics(); renderTrend(); renderGoals(); renderHistory(); renderInvestments(); renderCashback(); renderCats(); renderPays(); updateAlertBanner(); }
+function renderAll() { renderOverview(); renderAnalytics(); renderTrend(); renderGoals(); renderHistory(); renderInvestments(); renderCashback(); renderCats(); renderPays(); }
 runPays();
 renderAll();
 showView('overview');
