@@ -3,12 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#0d0512">
   <title>Мои Финансы</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="style.css?v=63">
-  <link rel="stylesheet" href="gtavi.css?v=3">
+  <link rel="stylesheet" href="style.css?v=64">
+  <link rel="stylesheet" href="gtavi.css?v=4">
 
   <script>
     // Тема и Liquid Glass применяются до отрисовки, чтобы не «мигало»
@@ -24,6 +26,7 @@
 
   <section id="view-overview" class="view">
     <h1 class="title">Счета</h1>
+    <div id="alert-banner" hidden></div>
     <div class="card balance">
       <div class="lbl">Общий баланс</div>
       <div class="big" id="total-balance">0 ₽</div>
@@ -304,7 +307,7 @@
   </div>
 </div>
 
-<script src="app.js?v=63"></script>
+<script src="app.js?v=64"></script>
 </body>
 </html>
 

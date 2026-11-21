@@ -63,6 +63,7 @@ const ICONS = {
   film:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 3v18m10-18v18M3 8h4m-4 8h4m10-8h4m-4 8h4"/>',
   ticket:'<path d="M2 9a3 3 0 0 0 0 6v4h20v-4a3 3 0 0 1 0-6V5H2z"/><path d="M13 5v2m0 4v2m0 4v2"/>',
   dumbbell:'<path d="m6.5 6.5 11 11m-14-8 5-5m8 16 5-5M3 8l5-5m8 18 5-5"/>',
+  bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
   hammer:'<path d="m15 12-8 8-4-4 8-8"/><path d="m18 9 3-3-3-3-3 3m-3 0 3 3"/>',
   car:'<path d="m5 17-1 3m16-3 1 3M3 11l2-6h14l2 6"/><path d="M3 11h18v6H3z"/><circle cx="7.5" cy="14.5" r="1"/><circle cx="16.5" cy="14.5" r="1"/>',
   flower:'<path d="M12 12c-5-8-9-2-3 1-8 1-5 8 2 4-2 8 6 8 4 0 7 4 10-3 2-4 6-3 2-9-3-1"/><circle cx="12" cy="12" r="2"/>',
@@ -185,6 +186,12 @@ function formatDate(iso) {
   const [y, m, d] = iso.split('-').map(Number);
   const M = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
   return `${d} ${M[m - 1]}` + (y !== new Date().getFullYear() ? ` ${y}` : '');
+}
+
+const WEEKDAYS = ['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'];
+function weekday(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return WEEKDAYS[new Date(y, m - 1, d).getDay()];
 }
 
 const bankPool = (b) => b && b.name.startsWith('Яндекс') ? 'Яндекс' : b && String(b.id);
@@ -1067,7 +1074,7 @@ function renderGoals() {
   $('goal-list').innerHTML = sorted.length ? sorted.map((g) => `
     <div class="swipe goal-swipe">
       <div class="swipe-actions"></div>
-      <div class="card goal" data-id="${g.id}"><b>${esc(g.name)}</b><span>${fmt.format(g.saved)} / ${fmt.format(g.target)}</span><div class="track"><i style="width:${Math.min(100,g.saved/g.target*100)}%"></i></div><small>${g.date ? `К ${formatDate(g.date)}` : `Осталось ${fmt.format(Math.max(0,g.target-g.saved))}`}</small></div>
+      <div class="card goal" data-id="${g.id}"><b>${esc(g.name)}</b><span>${Math.min(100, Math.round(g.saved / (g.target || 1) * 100))}% · ${fmt.format(g.saved)} / ${fmt.format(g.target)}</span><div class="track"><i style="width:${Math.min(100,g.saved/g.target*100)}%"></i></div><small>${g.date ? `К ${formatDate(g.date)}` : `Осталось ${fmt.format(Math.max(0,g.target-g.saved))}`}</small></div>
     </div>`).join('') : '<div class="empty">Пока нет целей</div>';
   $('goal-list').querySelectorAll('.swipe').forEach((el) => {
     const id = +el.querySelector('.goal').dataset.id;
@@ -1118,7 +1125,7 @@ function renderHistory() {
   for (const t of sorted) {
     if (t.date !== last) {
       if (last) html += '</div>';
-      html += `<div class="card list"><div class="sec">${formatDate(t.date)}</div>`;
+      html += `<div class="card list"><div class="sec">${formatDate(t.date)} · ${weekday(t.date)}</div>`;
       last = t.date;
     }
     const tr = t.type === 'transfer';
@@ -1367,6 +1374,52 @@ function renderPays() {
   });
 }
 
+// ---------- Алерты: акции и автоплатежи ----------
+const ALERT_SEEN_KEY = 'fin_alerts_seen';
+function loadSeen() { try { return JSON.parse(localStorage.getItem(ALERT_SEEN_KEY)) || []; } catch { return []; } }
+function saveSeen(list) { localStorage.setItem(ALERT_SEEN_KEY, JSON.stringify(list.slice(-60))); }
+function collectAlerts() {
+  const today = todayISO();
+  const tmrwDate = new Date(); tmrwDate.setDate(tmrwDate.getDate() + 1);
+  const tomorrow = localISODate(tmrwDate);
+  const list = [];
+  for (const o of cbOffers) {
+    if (!o.dateTo) continue;
+    if (o.dateTo === tomorrow) list.push({ key: `offer-tmrw-${o.id}-${tomorrow}`, text: `Завтра заканчивается спецакция «${o.name}» — успей получить кэшбэк` });
+    else if (o.dateTo === today) list.push({ key: `offer-today-${o.id}-${today}`, text: `Сегодня последний день спецакции «${o.name}»` });
+  }
+  const tmrwDay = tmrwDate.getDate();
+  for (const p of pays) {
+    if (+p.day === tmrwDay) {
+      const a = accounts.find(x => x.id === +(p.account || accounts[0]?.id));
+      list.push({ key: `pay-tmrw-${p.id}-${tomorrow}`, text: `Завтра автоплатёж «${p.name}» на ${money(p.amount, a?.currency || 'RUB')}${a ? ` со счёта «${a.name}»` : ''}` });
+    }
+  }
+  return list;
+}
+function pushNotifications(alerts) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const seen = loadSeen();
+  alerts.filter(a => !seen.includes(a.key)).forEach(a => {
+    try { new Notification('Мои Финансы', { body: a.text }); seen.push(a.key); } catch {}
+  });
+  saveSeen(seen);
+}
+function updateAlertBanner() {
+  const box = $('alert-banner');
+  if (!box) return;
+  const alerts = collectAlerts();
+  if (!alerts.length) { box.hidden = true; box.innerHTML = ''; return; }
+  const canAsk = 'Notification' in window && Notification.permission === 'default';
+  box.hidden = false;
+  box.innerHTML = alerts.map(a => `<div class="alert-item">${svgIcon('bell')}<span>${esc(a.text)}</span></div>`).join('')
+    + (canAsk ? '<button type="button" class="alert-notify">🔔 Включить уведомления</button>' : '');
+  box.querySelector('.alert-notify')?.addEventListener('click', () => {
+    Notification.requestPermission().then(p => { if (p === 'granted') { updateAlertBanner(); pushNotifications(collectAlerts()); } });
+  });
+  pushNotifications(alerts);
+}
+
 // ---------- Запуск ----------
 $('add-goal').onclick = () => openModal('goal');
 $('add-inv').onclick = () => { editing=null; openModal('inv'); };
@@ -1378,7 +1431,7 @@ $('add-cb-cat').onclick = () => {
   $('cbcat-name').value='';$('cbcat-icon').value='✨';openModal('cbcat');
 };
 $('add-cb-offer').onclick=()=>openModal('cb-offer');
-function renderAll() { renderOverview(); renderAnalytics(); renderTrend(); renderGoals(); renderHistory(); renderInvestments(); renderCashback(); renderCats(); renderPays(); }
+function renderAll() { renderOverview(); renderAnalytics(); renderTrend(); renderGoals(); renderHistory(); renderInvestments(); renderCashback(); renderCats(); renderPays(); updateAlertBanner(); }
 runPays();
 renderAll();
 showView('overview');
