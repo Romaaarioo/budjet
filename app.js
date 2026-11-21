@@ -264,7 +264,7 @@ function showView(name) {
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active',
     t.dataset.view === name || (t.dataset.view === 'more' && ['categories', 'autopays'].includes(name))));
   $('fab').hidden = name !== 'history'; // кнопка «+» только на «Операциях»
-  document.querySelector('main').scrollTop = 0;
+  window.scrollTo(0, 0);
   if (openSwipe) closeSwipe(openSwipe);
 }
 document.querySelectorAll('.tab').forEach((t) => (t.onclick = () => showView(t.dataset.view)));

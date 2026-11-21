@@ -66,26 +66,14 @@ body::after {
 /* ============ БАЗА ============ */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 [hidden] { display: none !important; }
-html { background: var(--bg); height: 100%; }
+html { background: var(--bg); }
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
   background: var(--bg);
   color: var(--text);
   -webkit-tap-highlight-color: transparent;
-  height: 100%;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  transition: background .3s, color .3s;
-}
-main {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  padding-top: env(safe-area-inset-top);
   padding-bottom: 96px;
+  transition: background .3s, color .3s;
 }
 .lbl { font-size: 13px; color: var(--muted); }
 .big { font-size: 38px; font-weight: 800; letter-spacing: -.5px; margin-top: 4px; }
@@ -212,12 +200,12 @@ main {
 }
 #fab:active { transform: scale(.9); }
 .tabs {
-  flex: 0 0 auto;
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
   display: flex;
   background: var(--nav);
   backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   border-top: 1px solid var(--sep);
-  padding: 7px 0 max(10px, calc(env(safe-area-inset-bottom) - 14px));
+  padding: 6px 0 calc(6px + env(safe-area-inset-bottom));
 }
 .tab {
   flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
